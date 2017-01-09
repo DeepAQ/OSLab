@@ -38,11 +38,11 @@ int get_int(int offset, int len)
 int get_next_clus(int curr_clus)
 {
     int clus_id = curr_clus / 2;
-    int fat_value = get_int(bpb.RsvdSecCnt * bpb.BytsPerSec + clus_id * 3, 24);
+    int fat_value = get_int(bpb.RsvdSecCnt * bpb.BytsPerSec + clus_id * 3, 3);
     if (curr_clus % 2 == 0) {
         return fat_value & 0x000fff;
     } else {
-        return fat_value & 0xfff000 / 0x1000;
+        return (fat_value & 0xfff000) / 0x1000;
     }
 }
 
@@ -146,11 +146,56 @@ void print_dir(struct Entry* entry, char* fullpath)
     }
 }
 
+void print_file(struct Entry* entry) {
+    int clus = entry->FstClus;
+    while (1) {
+        int offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec
+                + bpb.RootEntCnt * 32 + (clus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
+        for (int i = 0; i < bpb.BytsPerSec * bpb.SecPerClus; ++i) {
+            printf("%c", image[offset + i]);
+        }
+        if ((clus = get_next_clus(clus)) >= 0xff7) {
+            break;
+        }
+    }
+}
+
+void find_file(struct Entry* entry, char* path, char* target)
+{
+    struct Entry* ptr = entry->Children;
+    while (ptr != NULL) {
+        char* new_path = malloc(strlen(path) + strlen(ptr->Name) + strlen(ptr->Ext) + 2);
+        strcpy(new_path, path);
+        strcat(new_path, ptr->Name);
+        if (ptr->Type == 1) {
+            strcat(new_path, "/");
+            find_file(ptr, new_path, target);
+        } else {
+            strcat(new_path, ".");
+            strcat(new_path, ptr->Ext);
+            if (strcmp(new_path, target) == 0) {
+                print_file(ptr);
+                free(new_path);
+                return;
+            }
+        }
+        free(new_path);
+        ptr = ptr->Next;
+    }
+}
+
 int main()
 {
     load_img("test.img");
     get_bpb();
     get_dir(&root);
     print_dir(&root, "");
+    char command[1024];
+    while (1) {
+        printf("\nCommand: ");
+        gets(command);
+        strlwr(command);
+        find_file(&root, "", command);
+    }
     return 0;
 }
