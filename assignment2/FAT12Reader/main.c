@@ -8,29 +8,20 @@ unsigned char image[IMGSIZE];
 
 struct BPB
 {
-    int BytsPerSec;
-    int SecPerClus;
-    int RsvdSecCnt;
-    int NumFATs;
-    int RootEntCnt;
-    int FATSz16;
+    int BytsPerSec, SecPerClus, RsvdSecCnt, NumFATs, RootEntCnt, FATSz16;
 } bpb;
 
 struct Entry
 {
-    char Name[9];
-    char Ext[4];
-    int Type; // 0 for file, 1 for folder
-    int FstClus;
-    struct Entry* Next;
-    struct Entry* Children;
+    char Name[9], Ext[4];
+    int FstClus, Type; // 0 for file, 1 for folder
+    struct Entry *Next, *Children;
 } root;
 
 struct Count
 {
     char* Line;
-    int NumFile;
-    int NumDir;
+    int NumFile, NumDir;
 };
 
 int get_int(int offset, int len)
@@ -44,8 +35,8 @@ int get_int(int offset, int len)
 
 int get_next_clus(int curr_clus)
 {
-    int clus_id = curr_clus / 2;
-    int fat_value = get_int(bpb.RsvdSecCnt * bpb.BytsPerSec + clus_id * 3, 3);
+    int clus_id = curr_clus / 2,
+        fat_value = get_int(bpb.RsvdSecCnt * bpb.BytsPerSec + clus_id * 3, 3);
     if (curr_clus % 2 == 0) {
         return fat_value & 0x000fff;
     } else {
@@ -73,27 +64,34 @@ void get_bpb()
 
 void get_dir(struct Entry* entry)
 {
-    int is_root = 1;
-    int offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec;
-    if (entry->FstClus >= 2) {
+    int clus = entry->FstClus, is_root = 1,
+        offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec;
+    if (clus >= 2) {
         // in data area
         is_root = 0;
-        offset += bpb.RootEntCnt * 32 + (entry->FstClus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
+        offset += bpb.RootEntCnt * 32 + (clus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
     }
-    int finished = 0;
-    for (int i = offset; finished == 0; i += 32) {
-        if (image[i] == 0) {
+    for (int i = offset; ; i += 32) {
+        // finished?
+        if (is_root == 1 && i >= offset + bpb.RootEntCnt * 32) {
             break;
+        } else if (is_root == 0 && i >= offset + bpb.BytsPerSec * bpb.SecPerClus) {
+            if ((clus = get_next_clus(clus)) >= 0xff7) {
+                break;
+            } else {
+                i = offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec
+                        + bpb.RootEntCnt * 32 + (clus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
+            }
         }
-        struct Entry* new_entry = malloc(sizeof(struct Entry));
-        // entry name
-        int j;
-        for (j = i; j < i + 8 && image[j] != 0x20; j++) {
-            new_entry->Name[j-i] = image[j];
-        }
-        new_entry->Name[j-i] = 0;
-        // ignore ./ and ../
-        if (strcmp(new_entry->Name, ".") != 0 && strcmp(new_entry->Name, "..") != 0) {
+        // ignore invaild entries
+        if (image[i] != '.' && image[i] != 0 && image[i] != 5 && image[i] != 0xE5 && image[i + 0xB] != 0xF) {
+            struct Entry* new_entry = malloc(sizeof(struct Entry));
+            // entry name
+            int j;
+            for (j = i; j < i + 8 && image[j] != 0x20; j++) {
+                new_entry->Name[j-i] = image[j];
+            }
+            new_entry->Name[j-i] = 0;
             strlwr(new_entry->Name);
             // file or folder
             if (image[i + 0xB] != 0x10) {
@@ -125,12 +123,6 @@ void get_dir(struct Entry* entry)
             if (new_entry->Type == 1) {
                 get_dir(new_entry);
             }
-        }
-        // finished?
-        if (is_root == 1 && i >= offset + bpb.RootEntCnt * 32) {
-            finished = 1;
-        } else if (is_root == 0 && i >= offset + bpb.BytsPerSec * bpb.SecPerClus) {
-            finished = 1;
         }
     }
 }
@@ -257,6 +249,7 @@ int find_dir(struct Entry* entry, char* path, char* target)
             if (strcmp(new_path, target) == 0) {
                 struct Count* count = count_dir(ptr, 0);
                 printf("%s", count->Line);
+                free(count->Line);
                 free(count);
                 free(new_path);
                 return 1;
