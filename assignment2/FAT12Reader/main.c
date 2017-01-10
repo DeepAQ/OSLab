@@ -4,8 +4,6 @@
 
 #define IMGSIZE 1440*1024
 
-unsigned char image[IMGSIZE];
-
 struct BPB
 {
     int BytsPerSec, SecPerClus, RsvdSecCnt, NumFATs, RootEntCnt, FATSz16;
@@ -24,10 +22,38 @@ struct Count
     int NumFile, NumDir;
 };
 
+unsigned char image[IMGSIZE];
+void my_print(char* c);
+void my_print_char(char c);
+
+void my_strlwr(char* str) {
+    int i;
+    for (i = 0; str[i] != 0; ++i) {
+        if (str[i] >= 'A' && str[i] <= 'Z') {
+            str[i] += 'a' - 'A';
+        }
+    }
+}
+
+void my_itoa(int i, char* a){
+    char const digit[] = "0123456789";
+    char* p = a;
+    int shifter = i;
+    do {
+        p++;
+        shifter /= 10;
+    } while (shifter);
+    *p = 0;
+    do {
+        *(--p) = digit[i % 10];
+        i /= 10;
+    } while (i);
+}
+
 int get_int(int offset, int len)
 {
-    int result = 0;
-    for (int i = offset + len - 1; i >= offset; --i) {
+    int result = 0, i;
+    for (i = offset + len - 1; i >= offset; --i) {
         result = result * 256 + image[i];
     }
     return result;
@@ -64,14 +90,14 @@ void get_bpb()
 
 void get_dir(struct Entry* entry)
 {
-    int clus = entry->FstClus, is_root = 1,
+    int clus = entry->FstClus, is_root = 1, i,
         offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec;
     if (clus >= 2) {
         // in data area
         is_root = 0;
         offset += bpb.RootEntCnt * 32 + (clus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
     }
-    for (int i = offset; ; i += 32) {
+    for (i = offset; ; i += 32) {
         // finished?
         if (is_root == 1 && i >= offset + bpb.RootEntCnt * 32) {
             break;
@@ -92,7 +118,7 @@ void get_dir(struct Entry* entry)
                 new_entry->Name[j-i] = image[j];
             }
             new_entry->Name[j-i] = 0;
-            strlwr(new_entry->Name);
+            my_strlwr(new_entry->Name);
             // file or folder
             if (image[i + 0xB] != 0x10) {
                 // file
@@ -101,7 +127,7 @@ void get_dir(struct Entry* entry)
                     new_entry->Ext[j - i - 8] = image[j];
                 }
                 new_entry->Ext[j - i - 8] = 0;
-                strlwr(new_entry->Ext);
+                my_strlwr(new_entry->Ext);
             } else {
                 // folder
                 new_entry->Type = 1;
@@ -140,10 +166,16 @@ void print_dir(struct Entry* entry, char* fullpath)
                 print_dir(ptr, new_path);
                 free(new_path);
             } else {
-                printf("%s%s\n", fullpath, ptr->Name);
+                my_print(fullpath);
+                my_print(ptr->Name);
+                my_print("\n");
             }
         } else {
-            printf("%s%s.%s\n", fullpath, ptr->Name, ptr->Ext);
+            my_print(fullpath);
+            my_print(ptr->Name);
+            my_print(".");
+            my_print(ptr->Ext);
+            my_print("\n");
         }
         ptr = ptr->Next;
     }
@@ -152,10 +184,10 @@ void print_dir(struct Entry* entry, char* fullpath)
 void print_file(struct Entry* entry) {
     int clus = entry->FstClus;
     while (1) {
-        int offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec
+        int i, offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec
                 + bpb.RootEntCnt * 32 + (clus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
-        for (int i = 0; i < bpb.BytsPerSec * bpb.SecPerClus; ++i) {
-            printf("%c", image[offset + i]);
+        for (i = 0; i < bpb.BytsPerSec * bpb.SecPerClus; ++i) {
+            my_print_char(image[offset + i]);
         }
         if ((clus = get_next_clus(clus)) >= 0xff7) {
             break;
@@ -222,14 +254,15 @@ struct Count* count_dir(struct Entry* entry, int depth)
     }
     char* new_line = malloc(strlen(count->Line) + 128);
     new_line[0] = 0;
-    for (int i = 0; i < depth; ++i) {
+    int i;
+    for (i = 0; i < depth; ++i) {
         strcat(new_line, "  ");
     }
     strcat(new_line, entry->Name);
     strcat(new_line, " : ");
-    itoa(count->NumFile, new_line + strlen(new_line), 10);
+    my_itoa(count->NumFile, new_line + strlen(new_line));
     strcat(new_line, " files, ");
-    itoa(count->NumDir, new_line + strlen(new_line), 10);
+    my_itoa(count->NumDir, new_line + strlen(new_line));
     strcat(new_line, " directories\n");
     strcat(new_line, count->Line);
     free(count->Line);
@@ -248,7 +281,7 @@ int find_dir(struct Entry* entry, char* path, char* target)
             strcat(new_path, ptr->Name);
             if (strcmp(new_path, target) == 0) {
                 struct Count* count = count_dir(ptr, 0);
-                printf("%s", count->Line);
+                my_print(count->Line);
                 free(count->Line);
                 free(count);
                 free(new_path);
@@ -271,22 +304,27 @@ int main()
     print_dir(&root, "");
     char command[1024];
     while (1) {
-        printf("\n> Command: ");
-        gets(command);
-        strlwr(command);
+        my_print("\n> Command: ");
+        fgets(command, 1024, stdin);
         int len = strlen(command);
+        if (command[len - 1] == '\n') {
+            command[len - 1] = 0;
+        }
+        my_strlwr(command);
+        len = strlen(command);
         if (command[len - 1] == '/') {
             command[len - 1] = 0;
         }
         if (strstr(command, "count ") == command) {
             int result = find_dir(&root, "", command + 6);
             if (result <= 0) {
-                printf("%s is not a directory!\n", command + 6);
+                my_print(command + 6);
+                my_print(" is not a directory!\n");
             }
         } else {
             int result = find_file(&root, "", command);
             if (result <= 0) {
-                printf("Unknown file\n");
+                my_print("Unknown file\n");
             }
         }
     }
