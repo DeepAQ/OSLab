@@ -26,6 +26,13 @@ struct Entry
     struct Entry* Children;
 } root;
 
+struct Count
+{
+    char* Line;
+    int NumFile;
+    int NumDir;
+};
+
 int get_int(int offset, int len)
 {
     int result = 0;
@@ -173,12 +180,13 @@ int find_file(struct Entry* entry, char* path, char* target)
         strcpy(new_path, path);
         strcat(new_path, ptr->Name);
         if (ptr->Type == 1) {
-            strcat(new_path, "/");
             if (strcmp(new_path, target) == 0) {
+                strcat(new_path, "/");
                 print_dir(ptr, new_path);
                 free(new_path);
                 return 1;
             }
+            strcat(new_path, "/");
             result += find_file(ptr, new_path, target);
         } else {
             strcat(new_path, ".");
@@ -195,6 +203,73 @@ int find_file(struct Entry* entry, char* path, char* target)
     return result;
 }
 
+struct Count* count_dir(struct Entry* entry, int depth)
+{
+    struct Count* count = malloc(sizeof(struct Count));
+    count->Line = malloc(1);
+    count->Line[0] = 0;
+    count->NumFile = 0;
+    count->NumDir = 0;
+    struct Entry* ptr = entry->Children;
+    while (ptr != NULL) {
+        if (ptr->Type == 1) {
+            struct Count* new_count = count_dir(ptr, depth + 1);
+            count->NumFile += new_count->NumFile;
+            count->NumDir += new_count->NumDir + 1;
+            char* new_line = malloc(strlen(count->Line) + strlen(new_count->Line) + 1);
+            strcpy(new_line, count->Line);
+            strcat(new_line, new_count->Line);
+            free(new_count->Line);
+            free(new_count);
+            free(count->Line);
+            count->Line = new_line;
+        } else {
+            count->NumFile++;
+        }
+        ptr = ptr->Next;
+    }
+    char* new_line = malloc(strlen(count->Line) + 128);
+    new_line[0] = 0;
+    for (int i = 0; i < depth; ++i) {
+        strcat(new_line, "  ");
+    }
+    strcat(new_line, entry->Name);
+    strcat(new_line, " : ");
+    itoa(count->NumFile, new_line + strlen(new_line), 10);
+    strcat(new_line, " files, ");
+    itoa(count->NumDir, new_line + strlen(new_line), 10);
+    strcat(new_line, " directories\n");
+    strcat(new_line, count->Line);
+    free(count->Line);
+    count->Line = new_line;
+    return count;
+}
+
+int find_dir(struct Entry* entry, char* path, char* target)
+{
+    struct Entry* ptr = entry->Children;
+    int result = 0;
+    while (ptr != NULL) {
+        if (ptr->Type == 1) {
+            char* new_path = malloc(strlen(path) + strlen(ptr->Name) + strlen(ptr->Ext) + 2);
+            strcpy(new_path, path);
+            strcat(new_path, ptr->Name);
+            if (strcmp(new_path, target) == 0) {
+                struct Count* count = count_dir(ptr, 0);
+                printf("%s", count->Line);
+                free(count);
+                free(new_path);
+                return 1;
+            }
+            strcat(new_path, "/");
+            result += find_dir(ptr, new_path, target);
+            free(new_path);
+        }
+        ptr = ptr->Next;
+    }
+    return result;
+}
+
 int main()
 {
     load_img("test.img");
@@ -206,9 +281,20 @@ int main()
         printf("\n> Command: ");
         gets(command);
         strlwr(command);
-        int result = find_file(&root, "", command);
-        if (result <= 0) {
-            printf("Unknown file\n");
+        int len = strlen(command);
+        if (command[len - 1] == '/') {
+            command[len - 1] = 0;
+        }
+        if (strstr(command, "count ") == command) {
+            int result = find_dir(&root, "", command + 6);
+            if (result <= 0) {
+                printf("%s is not a directory!\n", command + 6);
+            }
+        } else {
+            int result = find_file(&root, "", command);
+            if (result <= 0) {
+                printf("Unknown file\n");
+            }
         }
     }
     return 0;
