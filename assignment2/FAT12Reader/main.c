@@ -69,9 +69,9 @@ void get_dir(struct Entry* entry)
     int is_root = 1;
     int offset = (bpb.RsvdSecCnt + bpb.FATSz16 * bpb.NumFATs) * bpb.BytsPerSec;
     if (entry->FstClus >= 2) {
-        // data area
+        // in data area
         is_root = 0;
-        offset += bpb.RootEntCnt * 32 + (entry->FstClus - 2) * bpb.BytsPerSec;
+        offset += bpb.RootEntCnt * 32 + (entry->FstClus - 2) * bpb.BytsPerSec * bpb.SecPerClus;
     }
     int finished = 0;
     for (int i = offset; finished == 0; i += 32) {
@@ -85,7 +85,9 @@ void get_dir(struct Entry* entry)
             new_entry->Name[j-i] = image[j];
         }
         new_entry->Name[j-i] = 0;
+        // ignore ./ and ../
         if (strcmp(new_entry->Name, ".") != 0 && strcmp(new_entry->Name, "..") != 0) {
+            strlwr(new_entry->Name);
             // file or folder
             if (image[i + 0xB] != 0x10) {
                 // file
@@ -94,12 +96,11 @@ void get_dir(struct Entry* entry)
                     new_entry->Ext[j - i - 8] = image[j];
                 }
                 new_entry->Ext[j - i - 8] = 0;
+                strlwr(new_entry->Ext);
             } else {
                 // folder
                 new_entry->Type = 1;
             }
-            strlwr(new_entry->Name);
-            strlwr(new_entry->Ext);
             new_entry->FstClus = get_int(i + 26, 2);
             new_entry->Next = NULL;
             new_entry->Children = NULL;
@@ -113,6 +114,7 @@ void get_dir(struct Entry* entry)
                 }
                 ptr->Next = new_entry;
             }
+            // recursively get dir
             if (new_entry->Type == 1) {
                 get_dir(new_entry);
             }
@@ -130,17 +132,19 @@ void print_dir(struct Entry* entry, char* fullpath)
 {
     struct Entry* ptr = entry->Children;
     while (ptr != NULL) {
-        printf("%s%s", fullpath, ptr->Name);
         if (ptr->Type == 1) {
-            printf("/\n");
-            char* new_path = malloc(strlen(fullpath) + strlen(ptr->Name) + 2);
-            strcpy(new_path, fullpath);
-            strcat(new_path, ptr->Name);
-            strcat(new_path, "/");
-            print_dir(ptr, new_path);
-            free(new_path);
+            if (ptr->Children != NULL) {
+                char* new_path = malloc(strlen(fullpath) + strlen(ptr->Name) + 2);
+                strcpy(new_path, fullpath);
+                strcat(new_path, ptr->Name);
+                strcat(new_path, "/");
+                print_dir(ptr, new_path);
+                free(new_path);
+            } else {
+                printf("%s%s\n", fullpath, ptr->Name);
+            }
         } else {
-            printf(".%s\n", ptr->Ext);
+            printf("%s%s.%s\n", fullpath, ptr->Name, ptr->Ext);
         }
         ptr = ptr->Next;
     }
@@ -160,28 +164,35 @@ void print_file(struct Entry* entry) {
     }
 }
 
-void find_file(struct Entry* entry, char* path, char* target)
+int find_file(struct Entry* entry, char* path, char* target)
 {
     struct Entry* ptr = entry->Children;
+    int result = 0;
     while (ptr != NULL) {
         char* new_path = malloc(strlen(path) + strlen(ptr->Name) + strlen(ptr->Ext) + 2);
         strcpy(new_path, path);
         strcat(new_path, ptr->Name);
         if (ptr->Type == 1) {
             strcat(new_path, "/");
-            find_file(ptr, new_path, target);
+            if (strcmp(new_path, target) == 0) {
+                print_dir(ptr, new_path);
+                free(new_path);
+                return 1;
+            }
+            result += find_file(ptr, new_path, target);
         } else {
             strcat(new_path, ".");
             strcat(new_path, ptr->Ext);
             if (strcmp(new_path, target) == 0) {
                 print_file(ptr);
                 free(new_path);
-                return;
+                return 1;
             }
         }
         free(new_path);
         ptr = ptr->Next;
     }
+    return result;
 }
 
 int main()
@@ -192,10 +203,13 @@ int main()
     print_dir(&root, "");
     char command[1024];
     while (1) {
-        printf("\nCommand: ");
+        printf("\n> Command: ");
         gets(command);
         strlwr(command);
-        find_file(&root, "", command);
+        int result = find_file(&root, "", command);
+        if (result <= 0) {
+            printf("Unknown file\n");
+        }
     }
     return 0;
 }
