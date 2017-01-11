@@ -157,24 +157,25 @@ void print_dir(struct Entry* entry, char* fullpath)
 {
     struct Entry* ptr = entry->Children;
     while (ptr != NULL) {
-        if (ptr->Type == 1) {
-            if (ptr->Children != NULL) {
-                char* new_path = malloc(strlen(fullpath) + strlen(ptr->Name) + 2);
-                strcpy(new_path, fullpath);
-                strcat(new_path, ptr->Name);
-                strcat(new_path, "/");
-                print_dir(ptr, new_path);
-                free(new_path);
-            } else {
-                my_print(fullpath);
-                my_print(ptr->Name);
-                my_print("\n");
-            }
+        if (ptr->Type == 1 && ptr->Children != NULL) {
+            char* new_path = malloc(strlen(fullpath) + strlen(ptr->Name) + 2);
+            strcpy(new_path, fullpath);
+            strcat(new_path, ptr->Name);
+            strcat(new_path, "/");
+            print_dir(ptr, new_path);
+            free(new_path);
         } else {
+            my_print("\x1b[36m");
             my_print(fullpath);
-            my_print(ptr->Name);
-            my_print(".");
-            my_print(ptr->Ext);
+            if (ptr->Type == 0) {
+                my_print("\x1b[0m");
+                my_print(ptr->Name);
+                my_print(".");
+                my_print(ptr->Ext);
+            } else {
+                my_print(ptr->Name);
+                my_print("\x1b[0m");
+            }
             my_print("\n");
         }
         ptr = ptr->Next;
@@ -314,6 +315,9 @@ int main()
         len = strlen(command);
         if (command[len - 1] == '/') {
             command[len - 1] = 0;
+        }
+        if (strcmp(command, "exit") == 0) {
+            return 0;
         }
         if (strstr(command, "count ") == command) {
             int result = find_dir(&root, "", command + 6);

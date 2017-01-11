@@ -1,3 +1,5 @@
+default rel
+
 section .bss
     iobuf: resb 1
 
