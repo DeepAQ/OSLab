@@ -10,25 +10,37 @@ section .data
     colors: db '31333536'
     
 section .bss
+    stdin: resq 1
+    stdout: resq 1
     iobuf: resb 1
+    charnum: resd 1
     numa: resb 128
     numb: resb 128
     
 section .text
+extern GetStdHandle, ReadConsoleA, WriteConsoleA, ExitProcess
 global main
 
 main: ;int main()
-    mov rax, 1 ;show prompt
-    mov rdi, 1
-    mov rsi, prompt
-    mov rdx, len_prompt
-    syscall
+    mov rcx, -10 ;get stdin handle
+    call GetStdHandle
+    mov [stdin], rax
+    mov rcx, -11 ;get stdout handle
+    call GetStdHandle
+    mov [stdout], rax
+    mov rcx, [stdout] ;show prompt
+    mov rdx, prompt
+    mov r8, len_prompt
+    mov r9, charnum
+    sub rsp, 8 ;align rsp
+    call WriteConsoleA
+    add rsp, 8
     mov rbx, -1 ;store number
     xor rbp, rbp ;numbers count
 loop_input:
     call getc
     mov r12, rax
-    cmp r12, 10
+    cmp r12, 13
     jne not_return
     cmp rbx, 0 ;return key
     jge calc
@@ -39,11 +51,11 @@ not_return:
     cmp rbx, 0 ;space key
     jl loop_input
 calc:
-    mov rdi, rbx
+    mov rcx, rbx
     call fib
-    mov rdi, rbp
+    mov rcx, rbp
     call print_num
-    cmp r12, 10
+    cmp r12, 13
     je end
     mov rbx, -1
     inc rbp
@@ -65,8 +77,8 @@ invalid:
     mov rbx, -1
     jmp loop_input
 end:
-    xor rax, rax ;return 0
-    ret
+    xor rcx, rcx ;return 0
+    call ExitProcess
 
 fib: ;void fib(int n)
     xor rax, rax
@@ -76,31 +88,31 @@ fib_clean: ;clear memory first, total 8Byte * 32 = 128Byte
     cmp rax, 32
     jl fib_clean
     mov rax, -1 ;count
-    xor rsi, rsi ;carry
+    xor r11, r11 ;carry
     mov byte [numa], 1 ;let a = 1
 fib_loop:
     inc rax
-    cmp rax, rdi
+    cmp rax, rcx
     jg fib_end
-    xor rcx, rcx ;bias for numa/numb
+    xor rdx, rdx ;bias for numa/numb
 fib_add: ;numa + numb -> numb
     xor r8, r8 ;digit in numa
     xor r9, r9 ;digit in numb
-    mov byte r8b, [numa + rcx]
-    mov byte r9b, [numb + rcx]
+    mov byte r8b, [numa + rdx]
+    mov byte r9b, [numb + rdx]
     mov r10, r8
     add r10, r9
-    add r10, rsi
-    xor rsi, rsi ;clear carry
+    add r10, r11
+    xor r11, r11 ;clear carry
     cmp r10, 10
     jl fib_added ;no carry
-    mov rsi, 1 ;has carry
+    mov r11, 1 ;has carry
     sub r10, 10
 fib_added:
-    mov byte [numa + rcx], r9b
-    mov byte [numb + rcx], r10b
-    inc rcx
-    cmp rcx, 128
+    mov byte [numa + rdx], r9b
+    mov byte [numb + rdx], r10b
+    inc rdx
+    cmp rdx, 128
     jl fib_add
     jmp fib_loop
 fib_end:
@@ -108,34 +120,40 @@ fib_end:
     ret
 
 getc: ;char getc()
-    mov rax, 0
-    mov rdi, 1
-    mov rsi, iobuf
-    mov rdx, 1
-    syscall
+    sub rsp, 48
+    mov rcx, [stdin]
+    mov rdx, iobuf
+    mov r8, 1
+    mov r9, charnum
+    mov qword [rsp+0x20], 0
+    call ReadConsoleA
     xor rax, rax
     mov byte al, [iobuf]
+    add rsp, 48
     ret
 
 print_num: ;void print_num(int number)
-    mov rsi, rdi
-    and rsi, 11b ;rsi %= 4
-    sal rsi, 1 ;rsi *= 2
-    add rsi, colors
-    push rsi
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, format1
-    mov rdx, length1
-    syscall
-    mov rax, 1
-    pop rsi
-    mov rdx, 2
-    syscall
-    mov rax, 1
-    mov rsi, format2
-    mov rdx, length2
-    syscall
+    push rbx
+    sub rsp, 40
+    mov rbx, rcx
+    mov rcx, [stdout]
+    mov rdx, format1
+    mov r8, length1
+    mov r9, charnum
+    call WriteConsoleA
+    and rbx, 11b ;r13 %= 4
+    sal rbx, 1 ;r13 *= 2
+    add rbx, colors
+    mov rcx, [stdout]
+    mov rdx, rbx
+    mov r8, 2
+    mov r9, charnum
+    call WriteConsoleA
+    mov rcx, [stdout]
+    mov rdx, format2
+    mov r8, length2
+    mov r9, charnum
+    call WriteConsoleA
     mov rbx, numb + 128
 print_loop: ;print numb
     dec rbx
@@ -151,16 +169,20 @@ print_loop1:
     mov byte dl, [rbx]
     add rdx, 48
     mov byte [iobuf], dl
-    mov rax, 1
-    mov rsi, iobuf
-    mov rdx, 1
-    syscall
+    mov rcx, [stdout]
+    mov rdx, iobuf
+    mov r8, 1
+    mov r9, charnum
+    call WriteConsoleA
     dec rbx
     jmp print_loop1
 print_loop_end:
-    mov rax, 1
-    mov rsi, format3
-    mov rdx, length3
-    syscall
+    mov rcx, [stdout]
+    mov rdx, format3
+    mov r8, length3
+    mov r9, charnum
+    call WriteConsoleA
     xor rax, rax
+    add rsp, 40
+    pop rbx
     ret
