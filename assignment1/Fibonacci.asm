@@ -84,10 +84,8 @@ fib_loop:
     jg fib_end
     xor rcx, rcx ;bias for numa/numb
 fib_add: ;numa + numb -> numb
-    xor r8, r8 ;digit in numa
-    xor r9, r9 ;digit in numb
-    mov byte r8b, [numa + rcx]
-    mov byte r9b, [numb + rcx]
+    movzx r8, byte [numa + rcx] ;digit in numa
+    movzx r9, byte [numb + rcx] ;digit in numb
     mov r10, r8
     add r10, r9
     add r10, rsi
@@ -113,8 +111,7 @@ getc: ;char getc()
     mov rsi, iobuf
     mov rdx, 1
     syscall
-    xor rax, rax
-    mov byte al, [iobuf]
+    movzx rax, byte [iobuf]
     ret
 
 print_num: ;void print_num(int number)
@@ -147,8 +144,7 @@ print_loop: ;print numb
 print_loop1:
     cmp rbx, numb
     jl print_loop_end
-    xor rdx, rdx
-    mov byte dl, [rbx]
+    movzx rdx, byte [rbx]
     add rdx, 48
     mov byte [iobuf], dl
     mov rax, 1
