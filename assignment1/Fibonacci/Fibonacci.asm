@@ -11,8 +11,8 @@ section .data
     
 section .bss
     iobuf: resb 1
-    numa: resb 128
-    numb: resb 128
+    numa: resb 4096
+    numb: resb 4096
     
 section .text
 global main
@@ -70,10 +70,10 @@ end:
 
 fib: ;void fib(int n)
     xor rax, rax
-fib_clean: ;clear memory first, total 8Byte * 32 = 128Byte
+fib_clean: ;clear memory first, total 8Bytes * 512 = 4096Bytes
     mov qword [numa + rax * 8], 0
     inc rax
-    cmp rax, 32
+    cmp rax, 1024
     jl fib_clean
     mov rax, -1 ;count
     xor rsi, rsi ;carry
@@ -98,7 +98,7 @@ fib_added:
     mov byte [numa + rcx], r9b
     mov byte [numb + rcx], r10b
     inc rcx
-    cmp rcx, 128
+    cmp rcx, 4096
     jl fib_add
     jmp fib_loop
 fib_end:
@@ -133,7 +133,7 @@ print_num: ;void print_num(int number)
     mov rsi, format2
     mov rdx, length2
     syscall
-    mov rbx, numb + 128
+    mov rbx, numb + 4096
 print_loop: ;print numb
     dec rbx
     cmp rbx, numb

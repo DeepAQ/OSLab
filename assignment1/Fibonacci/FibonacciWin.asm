@@ -14,8 +14,8 @@ section .bss
     stdout: resq 1
     iobuf: resb 1
     charnum: resd 1
-    numa: resb 128
-    numb: resb 128
+    numa: resb 4096
+    numb: resb 4096
     
 section .text
 extern GetStdHandle, ReadConsoleA, WriteConsoleA, ExitProcess
@@ -82,10 +82,10 @@ end:
 
 fib: ;void fib(int n)
     xor rax, rax
-fib_clean: ;clear memory first, total 8Byte * 32 = 128Byte
+fib_clean: ;clear memory first, total 8Bytes * 512 = 4096Bytes
     mov qword [numa + rax * 8], 0
     inc rax
-    cmp rax, 32
+    cmp rax, 1024
     jl fib_clean
     mov rax, -1 ;count
     xor r11, r11 ;carry
@@ -96,10 +96,8 @@ fib_loop:
     jg fib_end
     xor rdx, rdx ;bias for numa/numb
 fib_add: ;numa + numb -> numb
-    xor r8, r8 ;digit in numa
-    xor r9, r9 ;digit in numb
-    mov byte r8b, [numa + rdx]
-    mov byte r9b, [numb + rdx]
+    movzx r8, byte [numa + rdx] ;digit in numa
+    movzx r9, byte [numb + rdx] ;digit in numb
     mov r10, r8
     add r10, r9
     add r10, r11
@@ -112,7 +110,7 @@ fib_added:
     mov byte [numa + rdx], r9b
     mov byte [numb + rdx], r10b
     inc rdx
-    cmp rdx, 128
+    cmp rdx, 4096
     jl fib_add
     jmp fib_loop
 fib_end:
@@ -127,8 +125,7 @@ getc: ;char getc()
     mov r9, charnum
     mov qword [rsp+0x20], 0
     call ReadConsoleA
-    xor rax, rax
-    mov byte al, [iobuf]
+    movzx rax, byte [iobuf]
     add rsp, 48
     ret
 
@@ -154,7 +151,7 @@ print_num: ;void print_num(int number)
     mov r8, length2
     mov r9, charnum
     call WriteConsoleA
-    mov rbx, numb + 128
+    mov rbx, numb + 4096
 print_loop: ;print numb
     dec rbx
     cmp rbx, numb
@@ -165,8 +162,7 @@ print_loop: ;print numb
 print_loop1:
     cmp rbx, numb
     jl print_loop_end
-    xor rdx, rdx
-    mov byte dl, [rbx]
+    movzx rdx, byte [rbx]
     add rdx, 48
     mov byte [iobuf], dl
     mov rcx, [stdout]
