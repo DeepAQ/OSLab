@@ -5,7 +5,6 @@ section .bss
 
 section .text
 global my_print
-global my_print_char
 ; void my_print(char* c);
 my_print:
     mov rcx, rdi
@@ -29,6 +28,7 @@ my_print_end:
     xor rax, rax
     ret
 
+global my_print_char
 ; void my_print_char(char c);
 my_print_char:
     mov byte [iobuf], dil

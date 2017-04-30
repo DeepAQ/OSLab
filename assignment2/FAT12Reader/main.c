@@ -110,7 +110,8 @@ void get_dir(struct Entry* entry)
             }
         }
         // ignore invaild entries
-        if (image[i] != '.' && image[i] != 0 && image[i] != 5 && image[i] != 0xE5 && image[i + 0xB] != 0xF) {
+        if (image[i] != '.' && image[i] != 0 && image[i] != 5 && image[i] != 0xE5
+                && image[i + 0xB] != 0xF && (image[i + 0xB] & 0x2) == 0) {
             struct Entry* new_entry = malloc(sizeof(struct Entry));
             // entry name
             int j;
@@ -120,7 +121,7 @@ void get_dir(struct Entry* entry)
             new_entry->Name[j-i] = 0;
             my_strlwr(new_entry->Name);
             // file or folder
-            if (image[i + 0xB] != 0x10) {
+            if ((image[i + 0xB] & 0x10) == 0) {
                 // file
                 new_entry->Type = 0;
                 for (j = i + 8; j < i + 0xB && image[j] != 0x20; j++) {
@@ -198,6 +199,10 @@ void print_file(struct Entry* entry) {
 
 int find_file(struct Entry* entry, char* path, char* target)
 {
+    if (strcmp(path, target) == 0) {
+        print_dir(entry, path);
+        return 1;
+    }
     struct Entry* ptr = entry->Children;
     int result = 0;
     while (ptr != NULL) {
@@ -239,8 +244,9 @@ struct Count* count_dir(struct Entry* entry, int depth)
     while (ptr != NULL) {
         if (ptr->Type == 1) {
             struct Count* new_count = count_dir(ptr, depth + 1);
-            count->NumFile += new_count->NumFile;
-            count->NumDir += new_count->NumDir + 1;
+            // count->NumFile += new_count->NumFile;
+            // count->NumDir += new_count->NumDir;
+            count->NumDir++;
             char* new_line = malloc(strlen(count->Line) + strlen(new_count->Line) + 1);
             strcpy(new_line, count->Line);
             strcat(new_line, new_count->Line);
@@ -259,6 +265,9 @@ struct Count* count_dir(struct Entry* entry, int depth)
     for (i = 0; i < depth; ++i) {
         strcat(new_line, "  ");
     }
+    if (*entry->Name == 0) {
+        *entry->Name = '/';
+    }
     strcat(new_line, entry->Name);
     strcat(new_line, " : ");
     my_itoa(count->NumFile, new_line + strlen(new_line));
@@ -273,6 +282,13 @@ struct Count* count_dir(struct Entry* entry, int depth)
 
 int find_dir(struct Entry* entry, char* path, char* target)
 {
+    if (strcmp(path, target) == 0) {
+        struct Count* count = count_dir(entry, 0);
+        my_print(count->Line);
+        free(count->Line);
+        free(count);
+        return 1;
+    }
     struct Entry* ptr = entry->Children;
     int result = 0;
     while (ptr != NULL) {
@@ -299,30 +315,36 @@ int find_dir(struct Entry* entry, char* path, char* target)
 
 int main()
 {
-    load_img("test.img");
+    load_img("a.img");
     get_bpb();
     get_dir(&root);
     print_dir(&root, "");
     char command[1024];
     while (1) {
-        my_print("\n> Command: ");
+        my_print("\n\x1b[33mFAT12Reader\x1b[0m$ ");
         fgets(command, 1024, stdin);
+        my_strlwr(command);
         int len = strlen(command);
         if (command[len - 1] == '\n') {
-            command[len - 1] = 0;
+            command[--len] = 0;
         }
-        my_strlwr(command);
-        len = strlen(command);
+        if (command[len - 1] == '\r') {
+            command[--len] = 0;
+        }
         if (command[len - 1] == '/') {
-            command[len - 1] = 0;
+            command[--len] = 0;
         }
         if (strcmp(command, "exit") == 0) {
             return 0;
         }
         if (strstr(command, "count ") == command) {
-            int result = find_dir(&root, "", command + 6);
+            char *path = command + 6;
+            if (*path == '/') {
+                path++;
+            }
+            int result = find_dir(&root, "", path);
             if (result <= 0) {
-                my_print(command + 6);
+                my_print(path);
                 my_print(" is not a directory!\n");
             }
         } else {
