@@ -158,16 +158,17 @@ void print_dir(struct Entry* entry, char* fullpath)
 {
     struct Entry* ptr = entry->Children;
     while (ptr != NULL) {
-        if (ptr->Type == 1 && ptr->Children != NULL) {
-            char* new_path = malloc(strlen(fullpath) + strlen(ptr->Name) + 2);
-            strcpy(new_path, fullpath);
-            strcat(new_path, ptr->Name);
+        char* new_path = malloc(strlen(fullpath) + strlen(ptr->Name) + 2);
+        strcpy(new_path, fullpath);
+        if (*fullpath != 0) {
             strcat(new_path, "/");
+        }
+        if (ptr->Type == 1 && ptr->Children != NULL) {
+            strcat(new_path, ptr->Name);
             print_dir(ptr, new_path);
-            free(new_path);
         } else {
             my_print("\x1b[36m");
-            my_print(fullpath);
+            my_print(new_path);
             if (ptr->Type == 0) {
                 my_print("\x1b[0m");
                 my_print(ptr->Name);
@@ -175,10 +176,11 @@ void print_dir(struct Entry* entry, char* fullpath)
                 my_print(ptr->Ext);
             } else {
                 my_print(ptr->Name);
-                my_print("\x1b[0m");
+                my_print("/\x1b[0m");
             }
             my_print("\n");
         }
+        free(new_path);
         ptr = ptr->Next;
     }
 }
@@ -197,40 +199,36 @@ void print_file(struct Entry* entry) {
     }
 }
 
-int find_file(struct Entry* entry, char* path, char* target)
+struct Entry* find_file(struct Entry* entry, char* path, char* target)
 {
     if (strcmp(path, target) == 0) {
-        print_dir(entry, path);
-        return 1;
+        return entry;
     }
     struct Entry* ptr = entry->Children;
-    int result = 0;
     while (ptr != NULL) {
         char* new_path = malloc(strlen(path) + strlen(ptr->Name) + strlen(ptr->Ext) + 2);
         strcpy(new_path, path);
         strcat(new_path, ptr->Name);
-        if (ptr->Type == 1) {
-            if (strcmp(new_path, target) == 0) {
-                strcat(new_path, "/");
-                print_dir(ptr, new_path);
-                free(new_path);
-                return 1;
-            }
-            strcat(new_path, "/");
-            result += find_file(ptr, new_path, target);
-        } else {
+        if (ptr->Type == 0) {
             strcat(new_path, ".");
             strcat(new_path, ptr->Ext);
-            if (strcmp(new_path, target) == 0) {
-                print_file(ptr);
+        }
+        if (strcmp(new_path, target) == 0) {
+            free(new_path);
+            return ptr;
+        }
+        if (ptr->Type == 1) {
+            strcat(new_path, "/");
+            struct Entry* result = find_file(ptr, new_path, target);
+            if (result != NULL) {
                 free(new_path);
-                return 1;
+                return result;
             }
         }
         free(new_path);
         ptr = ptr->Next;
     }
-    return result;
+    return NULL;
 }
 
 struct Count* count_dir(struct Entry* entry, int depth)
@@ -280,43 +278,11 @@ struct Count* count_dir(struct Entry* entry, int depth)
     return count;
 }
 
-int find_dir(struct Entry* entry, char* path, char* target)
-{
-    if (strcmp(path, target) == 0) {
-        struct Count* count = count_dir(entry, 0);
-        my_print(count->Line);
-        free(count->Line);
-        free(count);
-        return 1;
-    }
-    struct Entry* ptr = entry->Children;
-    int result = 0;
-    while (ptr != NULL) {
-        if (ptr->Type == 1) {
-            char* new_path = malloc(strlen(path) + strlen(ptr->Name) + strlen(ptr->Ext) + 2);
-            strcpy(new_path, path);
-            strcat(new_path, ptr->Name);
-            if (strcmp(new_path, target) == 0) {
-                struct Count* count = count_dir(ptr, 0);
-                my_print(count->Line);
-                free(count->Line);
-                free(count);
-                free(new_path);
-                return 1;
-            }
-            strcat(new_path, "/");
-            result += find_dir(ptr, new_path, target);
-            free(new_path);
-        }
-        ptr = ptr->Next;
-    }
-    return result;
-}
-
 int main()
 {
     load_img("a.img");
     get_bpb();
+    root.Type = 1;
     get_dir(&root);
     print_dir(&root, "");
     char command[1024];
@@ -342,15 +308,25 @@ int main()
             if (*path == '/') {
                 path++;
             }
-            int result = find_dir(&root, "", path);
-            if (result <= 0) {
+            struct Entry *result = find_file(&root, "", path);
+            if (result == NULL) {
                 my_print(path);
                 my_print(" is not a directory!\n");
+            } else {
+                count_dir(result, 0);
             }
         } else {
-            int result = find_file(&root, "", command);
-            if (result <= 0) {
+            char *path = command;
+            if (*path == '/') {
+                path++;
+            }
+            struct Entry *result = find_file(&root, "", path);
+            if (result == NULL) {
                 my_print("Unknown file\n");
+            } else if (result->Type == 0) {
+                print_file(result);
+            } else {
+                print_dir(result, command);
             }
         }
     }
