@@ -309,11 +309,12 @@ int main()
                 path++;
             }
             struct Entry *result = find_file(&root, "", path);
-            if (result == NULL) {
+            if (result == NULL || result->Type != 1) {
                 my_print(path);
                 my_print(" is not a directory!\n");
             } else {
-                count_dir(result, 0);
+                struct Count *count = count_dir(result, 0);
+                my_print(count->Line);
             }
         } else {
             char *path = command;
