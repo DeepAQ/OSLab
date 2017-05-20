@@ -67,7 +67,7 @@ PRIVATE void render()
             col = 0;
             break;
         case '\t':
-            // TODO
+            col += 4 - (col % 4);
             break;
         default:
             vmem[(row * SCREEN_WIDTH + col) * 2] = text[i];
@@ -104,7 +104,14 @@ PUBLIC void in_process(u32 key)
             text[text_pos++] = '\t';
             render();
             break;
+        case BACKSPACE:
+            if (text_pos > 0) {
+                text[--text_pos] = 0;
+                render();
+            }
+            break;
         }
     }
+    text_pos %= TEXT_SIZE;
 }
 
