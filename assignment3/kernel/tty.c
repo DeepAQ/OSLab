@@ -21,10 +21,11 @@
 PRIVATE u8 *vmem = V_MEM_BASE;
 PRIVATE char text[TEXT_SIZE];
 PRIVATE int text_pos;
-PRIVATE int state;
+PRIVATE char state;
 PRIVATE char pattern[TEXT_SIZE];
 PRIVATE int pattern_pos;
 PRIVATE int cursor_pos;
+PRIVATE char caps_lock;
 
 PRIVATE void render();
 
@@ -36,7 +37,7 @@ PUBLIC void task_tty()
     // Init console
     disp_str("Loading console...\n");
     memset(text, 0, TEXT_SIZE);
-    text_pos = state = 0;
+    text_pos = state = caps_lock = 0;
     render();
     // Poll keyboard events
     while (1) {
@@ -90,7 +91,7 @@ PRIVATE void render()
             col = col % SCREEN_WIDTH;
         }
     }
-    for (int i = 0; state == 2 && i < pattern_pos; i++) {
+    for (int i = 0; state > 0 && i < pattern_pos; i++) {
         vmem[(row * SCREEN_WIDTH + col) * 2] = pattern[i];
         vmem[(row * SCREEN_WIDTH + col) * 2 + 1] = 0x0e;
         col++;
@@ -98,30 +99,41 @@ PRIVATE void render()
     set_cursor(row * SCREEN_WIDTH + col);
 }
 
+PRIVATE char get_char_from_key(u32 key) {
+    char c = key & 0xFF;
+    if (caps_lock) {
+        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+        else if (c >= 'a' && c <= 'z') c += 'A' - 'a';
+    }
+    return c;
+}
+
 /*======================================================================*
                 in_process
  *======================================================================*/
 PUBLIC void in_process(u32 key)
 {
-    if (state == 0) {
+    if ((key & FLAG_EXT) && (key & MASK_RAW) == CAPS_LOCK) {
+        caps_lock = 1 - caps_lock;
+        while (in_byte(KB_CMD) & 0x02);
+        out_byte(KB_DATA, 0xed);
+        while (in_byte(KB_DATA) != 0xfa);
+        while (in_byte(KB_CMD) & 0x02);
+        out_byte(KB_DATA, caps_lock << 2);
+        while (in_byte(KB_DATA) != 0xfa);
+    } else if (state == 0) {
         if (!(key & FLAG_EXT)) {
-            text[text_pos++] = key & 0xFF;
-            render();
+            text[text_pos++] = get_char_from_key(key);
         } else {
             switch(key & MASK_RAW) {
             case ENTER:
                 text[text_pos++] = '\n';
-                render();
                 break;
             case TAB:
                 text[text_pos++] = '\t';
-                render();
                 break;
             case BACKSPACE:
-                if (text_pos > 0) {
-                    text[--text_pos] = 0;
-                    render();
-                }
+                if (text_pos > 0) text[--text_pos] = 0;
                 break;
             case ESC:
                 memset(pattern, 0, TEXT_SIZE);
@@ -132,23 +144,21 @@ PUBLIC void in_process(u32 key)
         text_pos %= TEXT_SIZE;
     } else if (state == 1) {
         if (!(key & FLAG_EXT)) {
-            pattern[pattern_pos++] = key & 0xFF;
-            vmem[cursor_pos * 2] = key & 0xFF;
-            vmem[cursor_pos * 2 + 1] = 0x0e;
-            set_cursor(++cursor_pos);
+            pattern[pattern_pos++] = get_char_from_key(key);
         } else {
             switch (key & MASK_RAW) {
             case ENTER:
                 state = 2;
-                render();
+                break;
+            case BACKSPACE:
+                if (pattern_pos > 0) pattern[--pattern_pos] = 0;
                 break;
             case ESC:
                 state = 0;
-                render();
             }
         }
     } else if (state == 2 && (key & FLAG_EXT) && ((key & MASK_RAW) == ESC)) {
         state = 0;
-        render();
     }
+    render();
 }
