@@ -3,6 +3,7 @@
                                tty.c
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                                                     Forrest Yu, 2005
+                                                  Monkey Liang, 2017
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 #include "type.h"
@@ -29,9 +30,6 @@ PRIVATE char caps_lock;
 
 PRIVATE void render();
 
-/*======================================================================*
-                           task_tty
- *======================================================================*/
 PUBLIC void task_tty()
 {
     // Init console
@@ -42,6 +40,18 @@ PUBLIC void task_tty()
     // Poll keyboard events
     while (1) {
         keyboard_read();
+    }
+}
+
+PUBLIC void task_clear()
+{
+    while (1) {
+        milli_delay(200000);
+        if (state == 0) {
+            memset(text, 0, TEXT_SIZE);
+            text_pos = 0;
+            render();
+        }
     }
 }
 
@@ -84,7 +94,6 @@ PRIVATE void render()
                     for (; j > 0; j--) vmem[(row * SCREEN_WIDTH + col + j) * 2 - 1] = 0x0e;
             }
             col++;
-            break;
         }
         if (col >= SCREEN_WIDTH) {
             row = (row + 1) % SCREEN_HEIGHT;
@@ -108,17 +117,14 @@ PRIVATE char get_char_from_key(u32 key) {
     return c;
 }
 
-/*======================================================================*
-                in_process
- *======================================================================*/
 PUBLIC void in_process(u32 key)
 {
     if ((key & FLAG_EXT) && (key & MASK_RAW) == CAPS_LOCK) {
         caps_lock = 1 - caps_lock;
+        // set LEDs
         while (in_byte(KB_CMD) & 0x02);
         out_byte(KB_DATA, 0xed);
-        while (in_byte(KB_DATA) != 0xfa);
-        while (in_byte(KB_CMD) & 0x02);
+        while (in_byte(KB_DATA) != 0xfa && in_byte(KB_CMD) & 0x02);
         out_byte(KB_DATA, caps_lock << 2);
         while (in_byte(KB_DATA) != 0xfa);
     } else if (state == 0) {

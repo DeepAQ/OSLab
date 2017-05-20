@@ -21,11 +21,6 @@ PUBLIC void	delay(int time);
 /* kernel.asm */
 void restart();
 
-/* main.c */
-void TestA();
-void TestB();
-void TestC();
-
 /* i8259.c */
 PUBLIC void put_irq_handler(int irq, irq_handler handler);
 PUBLIC void spurious_irq(int irq);
@@ -39,6 +34,7 @@ PUBLIC void init_keyboard();
 
 /* tty.c */
 PUBLIC void task_tty();
+PUBLIC void task_clear();
 PUBLIC void in_process(u32 key);
 
 /* 以下是系统调用相关 */
