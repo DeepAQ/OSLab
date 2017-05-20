@@ -49,7 +49,7 @@ typedef struct s_task {
 
 
 /* Number of tasks */
-#define NR_TASKS	4
+#define NR_TASKS	1
 
 /* stacks of tasks */
 #define STACK_SIZE_TTY		0x8000
