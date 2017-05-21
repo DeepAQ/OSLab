@@ -20,6 +20,8 @@
 #define TEXT_SIZE V_MEM_SIZE / 2
 
 PRIVATE u8 *vmem = V_MEM_BASE;
+PRIVATE u8 vmem_buf[V_MEM_SIZE];
+
 PRIVATE char text[TEXT_SIZE];
 PRIVATE int text_pos;
 PRIVATE char state;
@@ -68,10 +70,10 @@ PRIVATE void set_cursor(unsigned int position)
 
 PRIVATE void render()
 {
-    // clear vmem
+    // clear vmem buffer
     for (int i = 0; i < V_MEM_SIZE / 2; i++) {
-        vmem[i * 2] = 0;
-        vmem[i * 2 + 1] = 0x0f;
+        vmem_buf[i * 2] = 0;
+        vmem_buf[i * 2 + 1] = 0x0f;
     }
     // start rendering
     int row = 0, col = 0;
@@ -86,12 +88,12 @@ PRIVATE void render()
             col += 4 - (col % 4);
             break;
         default:
-            vmem[(row * SCREEN_WIDTH + col) * 2] = text[i];
+            vmem_buf[(row * SCREEN_WIDTH + col) * 2] = text[i];
             if (state == 2 && text[i] == pattern[0]) {
                 int j;
                 for (j = 1; j < pattern_pos && i + j < text_pos && text[i + j] == pattern[j]; j++);
                 if (j == pattern_pos)
-                    for (; j > 0; j--) vmem[(row * SCREEN_WIDTH + col + j) * 2 - 1] = 0x0e;
+                    for (; j > 0; j--) vmem_buf[(row * SCREEN_WIDTH + col + j) * 2 - 1] = 0x0e;
             }
             col++;
         }
@@ -101,10 +103,13 @@ PRIVATE void render()
         }
     }
     for (int i = 0; state > 0 && i < pattern_pos; i++) {
-        vmem[(row * SCREEN_WIDTH + col) * 2] = pattern[i];
-        vmem[(row * SCREEN_WIDTH + col) * 2 + 1] = 0x0e;
+        vmem_buf[(row * SCREEN_WIDTH + col) * 2] = pattern[i];
+        vmem_buf[(row * SCREEN_WIDTH + col) * 2 + 1] = 0x0e;
         col++;
     }
+    // apply render results to display
+    for (int i = 0; i < V_MEM_SIZE; i++)
+        if (vmem[i] != vmem_buf[i]) vmem[i] = vmem_buf[i];
     set_cursor(row * SCREEN_WIDTH + col);
 }
 
