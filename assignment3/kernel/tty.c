@@ -108,8 +108,7 @@ PRIVATE void render()
         col++;
     }
     // apply render results to display
-    for (int i = 0; i < V_MEM_SIZE; i++)
-        if (vmem[i] != vmem_buf[i]) vmem[i] = vmem_buf[i];
+    memcpy(vmem, vmem_buf, V_MEM_SIZE);
     set_cursor(row * SCREEN_WIDTH + col);
 }
 
