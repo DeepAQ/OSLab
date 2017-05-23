@@ -12,6 +12,8 @@
 
 v_address find_vpn(m_size_t p_num);
 
+unsigned int pt_get(v_address vpn);
+
 void pt_put(v_address vpn, p_address ppn, m_pid_t pid);
 
 void pt_remove(v_address vpn);

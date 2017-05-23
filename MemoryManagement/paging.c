@@ -32,8 +32,17 @@ v_address find_vpn(m_size_t p_num) {
     return -1;
 }
 
+unsigned int pt_get(v_address vpn) {
+    if (vpn < 0 || vpn >= NUM_PAGE_MEM + NUM_PAGE_HDD)
+        return -1;
+    return (mem_read(BASE_PT + vpn * 4) << 24)
+            + (mem_read(BASE_PT + vpn * 4 + 1) << 16)
+            + (mem_read(BASE_PT + vpn * 4 + 2) << 8)
+            + mem_read(BASE_PT + vpn * 4 + 3);
+}
+
 void pt_put(v_address vpn, p_address ppn, m_pid_t pid) {
-    unsigned int pt_entry = ppn << 16 + pid;
+    unsigned int pt_entry = (ppn << 16) + pid;
     mem_write(pt_entry >> 24, BASE_PT + vpn * 4);
     mem_write(pt_entry >> 16, BASE_PT + vpn * 4 + 1);
     mem_write(pt_entry >> 8, BASE_PT + vpn * 4 + 2);
