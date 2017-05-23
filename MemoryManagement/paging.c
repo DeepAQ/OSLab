@@ -59,6 +59,17 @@ void pt_put(v_address vpn, p_address ppn, m_pid_t pid) {
 }
 
 void pt_remove(v_address vpn) {
+    unsigned int pt_entry = pt_get(vpn);
+    p_address ppn = pt_entry >> 16;
     mem_write(0, BASE_PT + vpn * 4 + 2);
     mem_write(0, BASE_PT + vpn * 4 + 3);
+    // update bitmap
+    mem_write(
+        mem_read(BASE_BM_VPN + vpn / 8) & (~(1 << (7 - (vpn % 8)))),
+        BASE_BM_VPN + vpn / 8
+    );
+    mem_write(
+        mem_read(BASE_BM_PPN + ppn / 8) & (~(1 << (7 - (ppn % 8)))),
+        BASE_BM_PPN + ppn / 8
+    );
 }

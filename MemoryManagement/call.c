@@ -9,11 +9,10 @@
 
 void init() {
     // init bitmap
-    for (int i = 0; i < SIZE_BM_PPN; i++) {
-//        mem_write(0, BASE_BM_VPN + i * 2);
-//        mem_write(0, BASE_BM_VPN + i * 2 + 1);
-//        mem_write(0, BASE_BM_PPN + i);
-    }
+    for (int i = 0; i < SIZE_BM_VPN; i++)
+        mem_write(0, BASE_BM_VPN + i);
+    for (int i = 0; i < SIZE_BM_PPN; i++)
+        mem_write(0, BASE_BM_PPN + i);
 }
 
 int read(data_unit *data, v_address address, m_pid_t pid) {
