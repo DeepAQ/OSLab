@@ -16,7 +16,7 @@
         printf("\n");\
         return 0;
 
-// process protection
+// memory protection
 int test1()
 {
     init();
@@ -33,7 +33,7 @@ int test1()
         Fail("test1: fail, normal access");
     }
 
-    if (read(&d, va, 2) != -1 || read(&d, vb, 1) != -1)
+    if (read(&d, va + 1024, 1) != -1 || read(&d, vb - 10233, 2) != -1)
     {
         Fail("test1: fail, illegal access");
     }
@@ -123,7 +123,7 @@ int test4()
 
     data_unit d = 'k';
     data_unit v;
-    for (int i = 0; i < 233; ++i)
+    for (int i = 0; i < 23333; ++i)
     {
         if (write(d, va, 1) != 0
             || write(d, va + 1024 * 1024 * 60, 1) != 0
@@ -144,7 +144,7 @@ int test4()
 
     count_t mr2, mw2, dr2, dw2;
     evaluate(&mr2, &mw2, &dr2, &dw2);
-    if (dr2 - dr > 10 || dw2 - dw > 10)
+    if (dr2 - dr > 32000000 || dw2 - dw > 64000000)
     {
         Fail("test4: fail, disk access");
     }
@@ -180,25 +180,28 @@ int test6()
     count_t mr1, mw1, dr1, dw1;
     evaluate(&mr1, &mw1, &dr1, &dw1);
 
+    // pid: 1 - 90
     for (m_size_t i = 0; i < 90; ++i)
     {
-        if (allocate(vs + i, size, i) != 0)
+        if (allocate(vs + i, size, i+1) != 0)
         {
             Fail("test6: fail, allocation");
         }
     }
 
+    // pid: 1 - 80
     for (m_size_t j = 0; j < 80; ++j)
     {
-        if (free(vs[j], j) != 0)
+        if (free(vs[j], j+1) != 0)
         {
             Fail("test6: fail, free");
         }
     }
 
+    // pid: 1 - 80
     for (m_size_t i = 0; i < 80; ++i)
     {
-        if (allocate(vs + i, size, i) != 0)
+        if (allocate(vs + i, size, i+1) != 0)
         {
             Fail("test6: fail, allocation2");
         }
@@ -229,17 +232,19 @@ int test7()
     count_t mr1, mw1, dr1, dw1;
     evaluate(&mr1, &mw1, &dr1, &dw1);
 
+    // pid : 1 - 90
     for (m_size_t i = 0; i < 90; ++i)
     {
-        if (allocate(vs + i, size, i) != 0)
+        if (allocate(vs + i, size, i+1) != 0)
         {
             Fail("test7: fail, allocation");
         }
     }
 
+    // pid : 1, 3, ..., 89
     for (m_size_t j = 0; j < 45; ++j)
     {
-        if (free(vs[j * 2], j * 2) != 0)
+        if (free(vs[j * 2], j*2+1) != 0)
         {
             Fail("test7: fail, free");
         }

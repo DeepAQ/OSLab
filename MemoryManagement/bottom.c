@@ -22,6 +22,10 @@ data_unit mem_read(p_address address)
     {
         exit(ERR_OUT_OF_BOUNDS);
     }
+    else if (mem_read_time == 0)
+    {
+        exit(ERR_COUNT_OVERFLOW);
+    }
     else
     {
         return memory[address];
@@ -36,6 +40,10 @@ void mem_write(data_unit data, p_address address)
     {
         exit(ERR_OUT_OF_BOUNDS);
     }
+    else if (mem_write_time == 0)
+    {
+        exit(ERR_COUNT_OVERFLOW);
+    }
     else
     {
         memory[address] = data;
@@ -47,7 +55,9 @@ void disk_load(p_address mem_offset, p_address disk_offset, m_size_t size)
     p_address mem_end = mem_offset + size;
     p_address disk_end = disk_offset + size;
 
-    disk_read_time += 1000;
+    count_t previous = disk_read_time;
+
+    disk_read_time += 20000;
 
     if (mem_end >= MEMORY_SIZE || disk_end >= DISK_SIZE || mem_offset >= MEMORY_SIZE || disk_offset >= DISK_SIZE)
     {
@@ -55,7 +65,12 @@ void disk_load(p_address mem_offset, p_address disk_offset, m_size_t size)
     }
     else
     {
-        disk_read_time += 300 * size;
+        disk_read_time += 10 * size;
+
+        if (disk_read_time < previous)
+        {
+            exit(ERR_COUNT_OVERFLOW);
+        }
 
         for (int i = 0; i < size; ++i)
         {
@@ -69,7 +84,9 @@ void disk_save(p_address mem_offset, p_address disk_offset, m_size_t size)
     p_address mem_end = mem_offset + size;
     p_address disk_end = disk_offset + size;
 
-    disk_write_time += 1000;
+    count_t previous = disk_write_time;
+
+    disk_write_time += 20000;
 
     if (mem_end >= MEMORY_SIZE || disk_end >= DISK_SIZE || mem_offset >= MEMORY_SIZE || disk_offset >= DISK_SIZE)
     {
@@ -77,7 +94,12 @@ void disk_save(p_address mem_offset, p_address disk_offset, m_size_t size)
     }
     else
     {
-        disk_write_time += 550 * size;
+        disk_write_time += 20 * size;
+
+        if (disk_write_time < previous)
+        {
+            exit(ERR_COUNT_OVERFLOW);
+        }
 
         for (int i = 0; i < size; ++i)
         {

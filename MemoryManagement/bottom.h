@@ -11,6 +11,7 @@
 #define DISK_SIZE 1024 * 1024 * 512
 
 #define ERR_OUT_OF_BOUNDS -10
+#define ERR_COUNT_OVERFLOW -20
 
 /*
  * ================= memory interfaces =================

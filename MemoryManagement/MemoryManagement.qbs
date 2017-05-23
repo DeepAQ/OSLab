@@ -7,6 +7,9 @@ CppApplication {
         "bottom.h",
         "call.c",
         "call.h",
+        "main.c",
+        "paging.c",
+        "paging.h",
         "test.c",
         "type.h",
     ]
