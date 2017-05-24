@@ -17,15 +17,16 @@ void init() {
 
 int read(data_unit *data, v_address address, m_pid_t pid) {
     v_address vpn = address / 4096;
-    unsigned int pt_entry = pt_get(vpn);
-    if (pt_entry < 0)
+    p_address ppn = vpt_get(vpn);
+    if (ppn > 0x03FFFF)
         return -1;
-    m_pid_t pt_pid = pt_entry & 0xFFFF;
-    if (pt_pid != pid)
+    unsigned int ppt_entry = ppt_get(ppn);
+    m_pid_t pt_pid = ppt_entry >> 12;
+    m_size_t pt_size = ppt_entry & 0x0FFF;
+    if (pt_pid != pid || address - vpn * 4096 > pt_size)
         return -1;
-    p_address pt_ppn = pt_entry >> 16;
-    if (pt_ppn < NUM_PAGE_MEM) {
-        *data = mem_read(pt_ppn * 4096 + address - vpn * 4096);
+    if (ppn < NUM_PAGE_MEM) {
+        *data = mem_read(BASE_MEM + ppn * 4096 + address - vpn * 4096);
     } else {
         // TODO swap
     }
@@ -34,15 +35,16 @@ int read(data_unit *data, v_address address, m_pid_t pid) {
 
 int write(data_unit data, v_address address, m_pid_t pid) {
     v_address vpn = address / 4096;
-    unsigned int pt_entry = pt_get(vpn);
-    if (pt_entry < 0)
+    p_address ppn = vpt_get(vpn);
+    if (ppn > 0x03FFFF)
         return -1;
-    m_pid_t pt_pid = pt_entry & 0xFFFF;
-    if (pt_pid != pid)
+    unsigned int ppt_entry = ppt_get(ppn);
+    m_pid_t pt_pid = ppt_entry >> 12;
+    m_size_t pt_size = ppt_entry & 0x0FFF;
+    if (pt_pid != pid || address - vpn * 4096 > pt_size)
         return -1;
-    p_address pt_ppn = pt_entry >> 16;
-    if (pt_ppn < NUM_PAGE_MEM) {
-        mem_write(data, pt_ppn * 4096 + address - vpn * 4096);
+    if (ppn < NUM_PAGE_MEM) {
+        mem_write(data, BASE_MEM + ppn * 4096 + address - vpn * 4096);
     } else {
         // TODO swap
     }
@@ -75,17 +77,19 @@ int allocate(v_address *address, m_size_t size, m_pid_t pid) {
     v_address vpn = find_vpn(num_p);
     *address = vpn * 4096;
     for (int i = 0; i < num_p; i++) {
-        pt_put(vpn + i, ppns[i], pid);
+        m_size_t p_size = (i == num_p - 1) ? size - (num_p - 1) * 4096 : 4096;
+        pt_put(vpn + i, ppns[i], pid, p_size);
     }
     return 0;
 }
 
 int free(v_address address, m_pid_t pid) {
     v_address vpn = address / 4096;
-    unsigned int pt_entry = pt_get(vpn);
-    if (pt_entry < 0)
+    p_address ppn = vpt_get(vpn);
+    if (ppn > 0x03FFFF)
         return -1;
-    m_pid_t pt_pid = pt_entry & 0xFFFF;
+    unsigned int ppt_entry = ppt_get(ppn);
+    m_pid_t pt_pid = ppt_entry >> 12;
     if (pt_pid != pid)
         return -1;
     pt_remove(vpn);
