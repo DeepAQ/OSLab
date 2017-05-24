@@ -17,9 +17,10 @@ void init() {
 
 int read(data_unit *data, v_address address, m_pid_t pid) {
     v_address vpn = address / 4096;
-    p_address ppn = vpt_get(vpn);
-    if (ppn > 0x03FFFF)
+    unsigned int vpt_entry = vpt_get(vpn);
+    if (vpt_entry > 0xFFFFFF)
         return -1;
+    p_address ppn = vpt_entry & 0x03FFFF;
     unsigned int ppt_entry = ppt_get(ppn);
     m_pid_t pt_pid = ppt_entry >> 12;
     m_size_t pt_size = ppt_entry & 0x0FFF;
@@ -35,9 +36,10 @@ int read(data_unit *data, v_address address, m_pid_t pid) {
 
 int write(data_unit data, v_address address, m_pid_t pid) {
     v_address vpn = address / 4096;
-    p_address ppn = vpt_get(vpn);
-    if (ppn > 0x03FFFF)
+    unsigned int vpt_entry = vpt_get(vpn);
+    if (vpt_entry > 0xFFFFFF)
         return -1;
+    p_address ppn = vpt_entry & 0x03FFFF;
     unsigned int ppt_entry = ppt_get(ppn);
     m_pid_t pt_pid = ppt_entry >> 12;
     m_size_t pt_size = ppt_entry & 0x0FFF;
@@ -78,20 +80,30 @@ int allocate(v_address *address, m_size_t size, m_pid_t pid) {
     *address = vpn * 4096;
     for (int i = 0; i < num_p; i++) {
         m_size_t p_size = (i == num_p - 1) ? size - (num_p - 1) * 4096 : 4096;
-        pt_put(vpn + i, ppns[i], pid, p_size);
+        data_unit continuation = (i < num_p - 1) ? 1 : 0;
+        pt_put(vpn + i, ppns[i], pid, p_size, continuation);
     }
     return 0;
 }
 
 int free(v_address address, m_pid_t pid) {
     v_address vpn = address / 4096;
-    p_address ppn = vpt_get(vpn);
-    if (ppn > 0x03FFFF)
+    unsigned int vpt_entry = vpt_get(vpn);
+    if (vpt_entry > 0xFFFFFF)
         return -1;
+    p_address ppn = vpt_entry & 0x03FFFF;
     unsigned int ppt_entry = ppt_get(ppn);
     m_pid_t pt_pid = ppt_entry >> 12;
     if (pt_pid != pid)
         return -1;
-    pt_remove(vpn);
+    while (1) {
+        pt_remove(vpn);
+        // Continuation
+        if ((vpt_entry & 0x400000) == 0)
+            break;
+        vpt_entry = vpt_get(++vpn);
+        if (vpt_entry > 0xFFFFFF)
+            break;
+    }
     return 0;
 }

@@ -43,7 +43,7 @@ unsigned int vpt_get(v_address vpn) {
     data_unit byte1 = mem_read(BASE_VPT + vpn * 3);
     if ((byte1 & 0x80) == 0)
         return 0xFFFFFFFF;
-    return ((byte1 & 0x03) << 16)
+    return (byte1 << 16)
             + (mem_read(BASE_VPT + vpn * 3 + 1) << 8)
             + mem_read(BASE_VPT + vpn * 3 + 2);
 }
@@ -56,9 +56,12 @@ unsigned int ppt_get(p_address ppn) {
             + mem_read(BASE_PPT + ppn * 3 + 2);
 }
 
-void pt_put(v_address vpn, p_address ppn, m_pid_t pid, m_size_t size) {
+void pt_put(v_address vpn, p_address ppn, m_pid_t pid, m_size_t size, data_unit continuation) {
     // write vpt
     unsigned int vpt_entry = ppn | 0x800000;
+    if (continuation > 0) {
+        vpt_entry |= 0x400000;
+    }
     mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
     mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
     mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);

@@ -17,7 +17,7 @@ unsigned int vpt_get(v_address vpn);
 
 unsigned int ppt_get(v_address vpn);
 
-void pt_put(v_address vpn, p_address ppn, m_pid_t pid, m_size_t size);
+void pt_put(v_address vpn, p_address ppn, m_pid_t pid, m_size_t size, data_unit continuation);
 
 void pt_remove(v_address vpn);
 
