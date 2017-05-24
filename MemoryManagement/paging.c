@@ -3,8 +3,32 @@
  * All Rights Reserved.
  */
 
+#include <stdlib.h>
+#include <time.h>
 #include "bottom.h"
 #include "paging.h"
+
+m_size_t get_available_mem() {
+    return (mem_read(BASE_AVL_MEM) << 8)
+            + mem_read(BASE_AVL_MEM + 1);
+}
+
+void set_available_mem(m_size_t size) {
+    mem_write(size >> 8, BASE_AVL_MEM);
+    mem_write(size, BASE_AVL_MEM + 1);
+}
+
+m_size_t get_available_hdd() {
+    return (mem_read(BASE_AVL_HDD) << 16)
+            + (mem_read(BASE_AVL_HDD + 1) << 8)
+            + mem_read(BASE_AVL_HDD + 2);
+}
+
+void set_available_hdd(m_size_t size) {
+    mem_write(size >> 16, BASE_AVL_HDD);
+    mem_write(size >> 8, BASE_AVL_HDD + 1);
+    mem_write(size, BASE_AVL_HDD + 2);
+}
 
 v_address find_vpn(m_size_t p_num) {
     int offset = 0;
@@ -38,7 +62,7 @@ v_address find_vpn(m_size_t p_num) {
 }
 
 unsigned int vpt_get(v_address vpn) {
-    if (vpn < 0 || vpn >= 2 * (NUM_PAGE_MEM + NUM_PAGE_HDD))
+    if (vpn >= 2 * (NUM_PAGE_MEM + NUM_PAGE_HDD))
         return 0xFFFFFFFF;
     data_unit byte1 = mem_read(BASE_VPT + vpn * 3);
     if ((byte1 & 0x80) == 0)
@@ -49,7 +73,7 @@ unsigned int vpt_get(v_address vpn) {
 }
 
 unsigned int ppt_get(p_address ppn) {
-    if (ppn < 0 || ppn >= NUM_PAGE_MEM + NUM_PAGE_HDD)
+    if (ppn >= NUM_PAGE_MEM + NUM_PAGE_HDD)
         return 0xFFFFFFFF;
     return (mem_read(BASE_PPT + ppn * 3) << 16)
             + (mem_read(BASE_PPT + ppn * 3 + 1) << 8)
@@ -79,6 +103,12 @@ void pt_put(v_address vpn, p_address ppn, m_pid_t pid, m_size_t size, data_unit 
         mem_read(BASE_BM_PPN + ppn / 8) | (1 << (7 - (ppn % 8))),
         BASE_BM_PPN + ppn / 8
     );
+    // update available pages
+    if (ppn < NUM_PAGE_MEM) {
+        set_available_mem(get_available_mem() - 1);
+    } else {
+        set_available_hdd(get_available_hdd() - 1);
+    }
 }
 
 void pt_remove(v_address vpn) {
@@ -94,4 +124,95 @@ void pt_remove(v_address vpn) {
         mem_read(BASE_BM_PPN + ppn / 8) & (~(1 << (7 - (ppn % 8)))),
         BASE_BM_PPN + ppn / 8
     );
+    // update available pages
+    if (ppn < NUM_PAGE_MEM) {
+        set_available_mem(get_available_mem() + 1);
+    } else {
+        set_available_hdd(get_available_hdd() + 1);
+    }
+}
+
+void pt_set_ppn(v_address vpn, p_address ppn, unsigned int vpt_entry, unsigned int ppt_entry) {
+
+}
+
+p_address hdd_swap(v_address vpn, unsigned int vpt_entry, unsigned int ppt_entry) {
+    p_address hdd_pn = vpt_entry & 0x03FFFF;
+    p_address hdd_offset = hdd_pn - NUM_PAGE_MEM;
+    p_address mem_pn;
+    if (get_available_mem() > 0) {
+        // Load directly
+        for (int i = 0; i < SIZE_BM_PPN; i++) {
+            data_unit bm_byte = mem_read(BASE_BM_PPN + i);
+            int j;
+            for (j = 0; j < 8; j++) {
+                if ((bm_byte & (1 << (7 - j))) == 0) {
+                    mem_pn = i * 8 + j;
+                    break;
+                }
+            }
+            if (mem_pn == i * 8 + j)
+                break;
+        }
+        // write new vpt entry
+        vpt_entry = (vpt_entry & 0xFC0000) + mem_pn;
+        mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
+        mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
+        mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);
+        // write new ppt entry
+        mem_write(ppt_entry >> 16, BASE_PPT + mem_pn * 3);
+        mem_write(ppt_entry >> 8, BASE_PPT + mem_pn * 3 + 1);
+        mem_write(ppt_entry, BASE_PPT + mem_pn * 3 + 2);
+        // update bitmap
+        mem_write(
+            mem_read(BASE_BM_PPN + hdd_pn / 8) & (~(1 << (7 - (hdd_pn % 8)))),
+            BASE_BM_PPN + hdd_pn / 8
+        );
+        mem_write(
+            mem_read(BASE_BM_PPN + mem_pn / 8) | (1 << (7 - (mem_pn % 8))),
+            BASE_BM_PPN + mem_pn / 8
+        );
+        // update available pages
+        set_available_mem(get_available_mem() - 1);
+        set_available_hdd(get_available_hdd() + 1);
+        // load data from disk
+        disk_load(BASE_MEM + mem_pn * 4096, hdd_offset * 4096, 4096);
+    } else {
+        // Random choice
+        srand(time(NULL));
+        while (1) {
+            v_address tmp_vpn = (rand() * rand()) % (2 * (NUM_PAGE_MEM + NUM_PAGE_HDD));
+            unsigned int tmp_vpt_entry = vpt_get(tmp_vpn);
+            p_address tmp_ppn = tmp_vpt_entry & 0x03FFFF;
+            if (tmp_vpt_entry < 0xFFFFFF && tmp_ppn < NUM_PAGE_MEM) {
+                mem_pn = tmp_ppn;
+                unsigned int tmp_ppt_entry = ppt_get(tmp_ppn);
+                // swap ppt entry
+                mem_write(ppt_entry >> 16, BASE_PPT + tmp_ppn * 3);
+                mem_write(ppt_entry >> 8, BASE_PPT + tmp_ppn * 3 + 1);
+                mem_write(ppt_entry, BASE_PPT + tmp_ppn * 3 + 2);
+                mem_write(tmp_ppt_entry >> 16, BASE_PPT + hdd_pn * 3);
+                mem_write(tmp_ppt_entry >> 8, BASE_PPT + hdd_pn * 3 + 1);
+                mem_write(tmp_ppt_entry, BASE_PPT + hdd_pn * 3 + 2);
+                // write new vpt entries
+                vpt_entry = (vpt_entry & 0xFC0000) + tmp_ppn;
+                mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
+                mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
+                mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);
+                tmp_vpt_entry = (tmp_vpt_entry & 0xFC0000) + hdd_pn;
+                mem_write(tmp_vpt_entry >> 16, BASE_VPT + tmp_vpn * 3);
+                mem_write(tmp_vpt_entry >> 8, BASE_VPT + tmp_vpn * 3 + 1);
+                mem_write(tmp_vpt_entry, BASE_VPT + tmp_vpn * 3 + 2);
+                // no need to update bitmap or available pages
+                // swap data
+                disk_load(BASE_MEM_SWAP, hdd_offset * 4096, 4096);
+                disk_save(BASE_MEM + tmp_ppn * 4096, hdd_offset * 4096, 4096);
+                for (int i = 0; i < 4096; i++) {
+                    mem_write(mem_read(BASE_MEM_SWAP + i), BASE_MEM + tmp_ppn * 4096 + i);
+                }
+                break;
+            }
+        }
+    }
+    return mem_pn;
 }

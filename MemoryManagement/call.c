@@ -13,6 +13,9 @@ void init() {
         mem_write(0, BASE_BM_VPN + i);
     for (int i = 0; i < SIZE_BM_PPN; i++)
         mem_write(0, BASE_BM_PPN + i);
+    // init available
+    set_available_mem(NUM_PAGE_MEM);
+    set_available_hdd(NUM_PAGE_HDD);
 }
 
 int read(data_unit *data, v_address address, m_pid_t pid) {
@@ -29,7 +32,8 @@ int read(data_unit *data, v_address address, m_pid_t pid) {
     if (ppn < NUM_PAGE_MEM) {
         *data = mem_read(BASE_MEM + ppn * 4096 + address - vpn * 4096);
     } else {
-        // TODO swap
+        p_address new_ppn = hdd_swap(vpn, vpt_entry, ppt_entry);
+        *data = mem_read(BASE_MEM + new_ppn * 4096 + address - vpn * 4096);
     }
     return 0;
 }
@@ -48,7 +52,8 @@ int write(data_unit data, v_address address, m_pid_t pid) {
     if (ppn < NUM_PAGE_MEM) {
         mem_write(data, BASE_MEM + ppn * 4096 + address - vpn * 4096);
     } else {
-        // TODO swap
+        p_address new_ppn = hdd_swap(vpn, vpt_entry, ppt_entry);
+        mem_write(data, BASE_MEM + new_ppn * 4096 + address - vpn * 4096);
     }
     return 0;
 }
@@ -59,29 +64,28 @@ int allocate(v_address *address, m_size_t size, m_pid_t pid) {
     m_size_t num_p = size / 4096;
     if (size - num_p * 4096 > 0)
         num_p++;
-    p_address ppns[num_p];
+    // Check size
+    m_size_t avl_mem = get_available_mem();
+    if (avl_mem < num_p && avl_mem + get_available_hdd() < num_p)
+        return -1;
+    // Find and allocate pages
+    v_address vpn = find_vpn(num_p);
+    *address = vpn * 4096;
     m_size_t num_pn = 0;
     for (int i = 0; i < SIZE_BM_PPN; i++) {
         data_unit bm_byte = mem_read(BASE_BM_PPN + i);
         for (int j = 0; j < 8; j++) {
             if ((bm_byte & (1 << (7 - j))) == 0) {
-                ppns[num_pn] = i * 8 + j;
                 num_pn++;
+                m_size_t p_size = (num_pn == num_p) ? size - (num_p - 1) * 4096 : 4096;
+                data_unit continuation = (num_pn < num_p) ? 1 : 0;
+                pt_put(vpn + num_pn - 1, i * 8 + j, pid, p_size, continuation);
                 if (num_pn >= num_p)
                     break;
             }
         }
         if (num_pn >= num_p)
             break;
-    }
-    if (num_pn < num_p)
-        return -1;
-    v_address vpn = find_vpn(num_p);
-    *address = vpn * 4096;
-    for (int i = 0; i < num_p; i++) {
-        m_size_t p_size = (i == num_p - 1) ? size - (num_p - 1) * 4096 : 4096;
-        data_unit continuation = (i < num_p - 1) ? 1 : 0;
-        pt_put(vpn + i, ppns[i], pid, p_size, continuation);
     }
     return 0;
 }
