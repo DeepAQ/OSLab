@@ -59,7 +59,7 @@ void disk_load(p_address mem_offset, p_address disk_offset, m_size_t size)
 
     disk_read_time += 20000;
 
-    if (mem_end >= MEMORY_SIZE || disk_end >= DISK_SIZE || mem_offset >= MEMORY_SIZE || disk_offset >= DISK_SIZE)
+    if (mem_end > MEMORY_SIZE || disk_end > DISK_SIZE || mem_offset >= MEMORY_SIZE || disk_offset >= DISK_SIZE)
     {
         exit(ERR_OUT_OF_BOUNDS);
     }
@@ -88,7 +88,7 @@ void disk_save(p_address mem_offset, p_address disk_offset, m_size_t size)
 
     disk_write_time += 20000;
 
-    if (mem_end >= MEMORY_SIZE || disk_end >= DISK_SIZE || mem_offset >= MEMORY_SIZE || disk_offset >= DISK_SIZE)
+    if (mem_end > MEMORY_SIZE || disk_end > DISK_SIZE || mem_offset >= MEMORY_SIZE || disk_offset >= DISK_SIZE)
     {
         exit(ERR_OUT_OF_BOUNDS);
     }

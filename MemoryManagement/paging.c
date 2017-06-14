@@ -72,6 +72,12 @@ unsigned int vpt_get(v_address vpn) {
             + mem_read(BASE_VPT + vpn * 3 + 2);
 }
 
+unsigned int vpt_put(v_address vpn, unsigned int vpt_entry) {
+    mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
+    mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
+    mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);
+}
+
 unsigned int ppt_get(p_address ppn) {
     if (ppn >= NUM_PAGE_MEM + NUM_PAGE_HDD)
         return 0xFFFFFFFF;
@@ -80,20 +86,22 @@ unsigned int ppt_get(p_address ppn) {
             + mem_read(BASE_PPT + ppn * 3 + 2);
 }
 
+unsigned int ppt_put(p_address ppn, unsigned int ppt_entry) {
+    mem_write(ppt_entry >> 16, BASE_PPT + ppn * 3);
+    mem_write(ppt_entry >> 8, BASE_PPT + ppn * 3 + 1);
+    mem_write(ppt_entry, BASE_PPT + ppn * 3 + 2);
+}
+
 void pt_put(v_address vpn, p_address ppn, m_pid_t pid, m_size_t size, data_unit continuation) {
     // write vpt
     unsigned int vpt_entry = ppn | 0x800000;
     if (continuation > 0) {
         vpt_entry |= 0x400000;
     }
-    mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
-    mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
-    mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);
+    vpt_put(vpn, vpt_entry);
     // write ppt
     unsigned int ppt_entry = (pid << 12) + size - 1;
-    mem_write(ppt_entry >> 16, BASE_PPT + ppn * 3);
-    mem_write(ppt_entry >> 8, BASE_PPT + ppn * 3 + 1);
-    mem_write(ppt_entry, BASE_PPT + ppn * 3 + 2);
+    ppt_put(ppn, ppt_entry);
     // update bitmap
     mem_write(
         mem_read(BASE_BM_VPN + vpn / 8) | (1 << (7 - (vpn % 8))),
@@ -132,10 +140,6 @@ void pt_remove(v_address vpn) {
     }
 }
 
-void pt_set_ppn(v_address vpn, p_address ppn, unsigned int vpt_entry, unsigned int ppt_entry) {
-
-}
-
 p_address hdd_swap(v_address vpn, unsigned int vpt_entry, unsigned int ppt_entry) {
     p_address hdd_pn = vpt_entry & 0x03FFFF;
     p_address hdd_offset = hdd_pn - NUM_PAGE_MEM;
@@ -155,14 +159,9 @@ p_address hdd_swap(v_address vpn, unsigned int vpt_entry, unsigned int ppt_entry
                 break;
         }
         // write new vpt entry
-        vpt_entry = (vpt_entry & 0xFC0000) + mem_pn;
-        mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
-        mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
-        mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);
+        vpt_put(vpn, (vpt_entry & 0xFC0000) + mem_pn);
         // write new ppt entry
-        mem_write(ppt_entry >> 16, BASE_PPT + mem_pn * 3);
-        mem_write(ppt_entry >> 8, BASE_PPT + mem_pn * 3 + 1);
-        mem_write(ppt_entry, BASE_PPT + mem_pn * 3 + 2);
+        ppt_put(mem_pn, ppt_entry);
         // update bitmap
         mem_write(
             mem_read(BASE_BM_PPN + hdd_pn / 8) & (~(1 << (7 - (hdd_pn % 8)))),
@@ -176,7 +175,7 @@ p_address hdd_swap(v_address vpn, unsigned int vpt_entry, unsigned int ppt_entry
         set_available_mem(get_available_mem() - 1);
         set_available_hdd(get_available_hdd() + 1);
         // load data from disk
-        disk_load(BASE_MEM + mem_pn * 4096, hdd_offset * 4096, 4096);
+        disk_load(BASE_MEM + mem_pn * PAGE_SIZE, hdd_offset * PAGE_SIZE, PAGE_SIZE);
     } else {
         // Random choice
         srand(time(NULL));
@@ -188,27 +187,17 @@ p_address hdd_swap(v_address vpn, unsigned int vpt_entry, unsigned int ppt_entry
                 mem_pn = tmp_ppn;
                 unsigned int tmp_ppt_entry = ppt_get(tmp_ppn);
                 // swap ppt entry
-                mem_write(ppt_entry >> 16, BASE_PPT + tmp_ppn * 3);
-                mem_write(ppt_entry >> 8, BASE_PPT + tmp_ppn * 3 + 1);
-                mem_write(ppt_entry, BASE_PPT + tmp_ppn * 3 + 2);
-                mem_write(tmp_ppt_entry >> 16, BASE_PPT + hdd_pn * 3);
-                mem_write(tmp_ppt_entry >> 8, BASE_PPT + hdd_pn * 3 + 1);
-                mem_write(tmp_ppt_entry, BASE_PPT + hdd_pn * 3 + 2);
+                ppt_put(tmp_ppn, ppt_entry);
+                ppt_put(hdd_pn, tmp_ppt_entry);
                 // write new vpt entries
-                vpt_entry = (vpt_entry & 0xFC0000) + tmp_ppn;
-                mem_write(vpt_entry >> 16, BASE_VPT + vpn * 3);
-                mem_write(vpt_entry >> 8, BASE_VPT + vpn * 3 + 1);
-                mem_write(vpt_entry, BASE_VPT + vpn * 3 + 2);
-                tmp_vpt_entry = (tmp_vpt_entry & 0xFC0000) + hdd_pn;
-                mem_write(tmp_vpt_entry >> 16, BASE_VPT + tmp_vpn * 3);
-                mem_write(tmp_vpt_entry >> 8, BASE_VPT + tmp_vpn * 3 + 1);
-                mem_write(tmp_vpt_entry, BASE_VPT + tmp_vpn * 3 + 2);
+                vpt_put(vpn, (vpt_entry & 0xFC0000) + tmp_ppn);
+                vpt_put(tmp_vpn, (tmp_vpt_entry & 0xFC0000) + hdd_pn);
                 // no need to update bitmap or available pages
                 // swap data
-                disk_load(BASE_MEM_SWAP, hdd_offset * 4096, 4096);
-                disk_save(BASE_MEM + tmp_ppn * 4096, hdd_offset * 4096, 4096);
-                for (int i = 0; i < 4096; i++) {
-                    mem_write(mem_read(BASE_MEM_SWAP + i), BASE_MEM + tmp_ppn * 4096 + i);
+                disk_load(BASE_MEM_SWAP, hdd_offset * PAGE_SIZE, PAGE_SIZE);
+                disk_save(BASE_MEM + tmp_ppn * PAGE_SIZE, hdd_offset * PAGE_SIZE, PAGE_SIZE);
+                for (int i = 0; i < PAGE_SIZE; i++) {
+                    mem_write(mem_read(BASE_MEM_SWAP + i), BASE_MEM + tmp_ppn * PAGE_SIZE + i);
                 }
                 break;
             }
