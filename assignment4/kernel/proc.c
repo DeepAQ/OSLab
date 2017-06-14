@@ -18,23 +18,23 @@
  *======================================================================*/
 PUBLIC void schedule()
 {
-	PROCESS* p;
-	int	 greatest_ticks = 0;
+    PROCESS* p;
+    int	 greatest_ticks = 0;
 
-	while (!greatest_ticks) {
-		for (p = proc_table; p < proc_table+NR_TASKS; p++) {
-			if (p->ticks > greatest_ticks) {
-				greatest_ticks = p->ticks;
-				p_proc_ready = p;
-			}
-		}
+    while (!greatest_ticks) {
+        for (p = proc_table; p < proc_table+NR_TASKS; p++) {
+            if (p->ticks > greatest_ticks) {
+                greatest_ticks = p->ticks;
+                p_proc_ready = p;
+            }
+        }
 
-		if (!greatest_ticks) {
-			for (p = proc_table; p < proc_table+NR_TASKS; p++) {
-				p->ticks = p->priority;
-			}
-		}
-	}
+        if (!greatest_ticks) {
+            for (p = proc_table; p < proc_table+NR_TASKS; p++) {
+                p->ticks = p->priority;
+            }
+        }
+    }
 }
 
 /*======================================================================*
@@ -42,6 +42,25 @@ PUBLIC void schedule()
  *======================================================================*/
 PUBLIC int sys_get_ticks()
 {
-	return ticks;
+    return ticks;
 }
 
+PUBLIC void sys_process_sleep()
+{
+    // TODO
+}
+
+PUBLIC void sys_disp_str(char* str)
+{
+    disp_str(str);
+}
+
+PUBLIC void sys_sem_p()
+{
+    // TODO
+}
+
+PUBLIC void sys_sem_v()
+{
+    // TODO
+}
