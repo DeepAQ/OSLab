@@ -34,6 +34,7 @@ get_ticks:
 
 process_sleep:
 	mov	eax, _NR_process_sleep
+        mov     ebx, [esp + 4]
 	int	INT_VECTOR_SYS_CALL
 	ret
 

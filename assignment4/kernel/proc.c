@@ -21,18 +21,20 @@ PUBLIC void schedule()
     PROCESS* p;
     int	 greatest_ticks = 0;
 
-    while (!greatest_ticks) {
-        for (p = proc_table; p < proc_table+NR_TASKS; p++) {
-            if (p->ticks > greatest_ticks) {
-                greatest_ticks = p->ticks;
-                p_proc_ready = p;
-            }
+    for (p = proc_table; p < proc_table + NR_TASKS; p++) {
+        if (p->sleep_ticks > 0) {
+            p->sleep_ticks--;
         }
+    }
 
-        if (!greatest_ticks) {
-            for (p = proc_table; p < proc_table+NR_TASKS; p++) {
-                p->ticks = p->priority;
-            }
+    p_proc_ready++;
+    if (p_proc_ready >= proc_table + NR_TASKS) {
+        p_proc_ready = proc_table;
+    }
+    while (p_proc_ready->sleep_ticks > 0) {
+        p_proc_ready++;
+        if (p_proc_ready >= proc_table + NR_TASKS) {
+            p_proc_ready = proc_table;
         }
     }
 }
@@ -45,9 +47,10 @@ PUBLIC int sys_get_ticks()
     return ticks;
 }
 
-PUBLIC void sys_process_sleep()
+PUBLIC void sys_process_sleep(int mill_seconds)
 {
-    // TODO
+    p_proc_ready->sleep_ticks = mill_seconds * HZ / 1000;
+    schedule();
 }
 
 PUBLIC void sys_disp_str(char* str)
