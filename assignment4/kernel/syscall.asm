@@ -38,7 +38,8 @@ process_sleep:
 	ret
 
 new_disp_str:
-	mov	eax, _NR_disp_str
+        mov	eax, _NR_disp_str
+        mov     ebx, [esp + 4]
 	int	INT_VECTOR_SYS_CALL
 	ret
 
