@@ -13,6 +13,11 @@
 #include "proc.h"
 #include "global.h"
 
+#define NR_CHAIR 2
+
+int waiting;
+int customer_id;
+SEMAPHORE customer, barber, mutex;
 
 /*======================================================================*
                             kernel_main
@@ -61,6 +66,14 @@ PUBLIC int kernel_main()
 		selector_ldt += 1 << 3;
 	}
 
+        waiting = 0;
+        customer_id = 0;
+        customer.value = barber.value = 0;
+        mutex.value = 1;
+
+        memset(0xB8000, 0, 80 * 25 * 2);
+        disp_pos = 0;
+
 	k_reenter = 0;
 	ticks = 0;
 
@@ -76,7 +89,7 @@ PUBLIC int kernel_main()
 
 	restart();
 
-	while(1){}
+        while(1){}
 }
 
 /*======================================================================*
@@ -87,50 +100,49 @@ void TestA()
         while (1) {}
 }
 
-#define NR_CHAIR 2
-
-int chair;
-int waiting;
-int customer_id;
-int my_queue[NR_CHAIR];
-
 void B()
 {
-    chair = NR_CHAIR;
-    waiting = 0;
-    customer_id = 0;
+    process_sleep(50000);
+    new_disp_str("Barber online\n");
     while(1){
-        if (waiting > 0) {
-            int customer = my_queue[0];
-            waiting--;
-            for (int i = 0; i < waiting; i++) {
-                my_queue[i] = my_queue[i + 1];
-            }
-            new_disp_str("Cut hair: ");
-            disp_int(customer);
-            new_disp_str("\n");
-            process_sleep(70000);
-            disp_int(customer);
-            new_disp_str(" done!\n");
-            chair++;
-        }
+        sem_p(&customer);
+
+        new_disp_str("Barber begins to cut hair...\n");
+        process_sleep(120000);
+        new_disp_str("Barber haircut done!\n");
+
+        sem_v(&barber);
     }
 }
 
 void CDE()
 {
     while (1) {
-        process_sleep(50000);
+        sem_p(&mutex);
         customer_id++;
-        disp_int(customer_id);
-        new_disp_str(" coming\n");
-        if (chair <= 0) {
-            disp_int(customer_id);
-            new_disp_str(" no chair, leave\n");
+
+        int my_id = customer_id;
+        new_disp_str("Customer ");
+        disp_int(my_id);
+        if (waiting >= NR_CHAIR) {
+            new_disp_str(" come, no chair, leave\n");
+            sem_v(&mutex);
         } else {
-            chair--;
             waiting++;
-            my_queue[waiting - 1] = customer_id;
+            new_disp_str(" come, waiting\n");
+            sem_v(&mutex);
+
+            sem_v(&customer);
+            sem_p(&barber);
+
+            new_disp_str("Customer ");
+            disp_int(my_id);
+            new_disp_str(" got haircut, leave\n");
+
+            sem_p(&mutex);
+            waiting--;
+            sem_v(&mutex);
         }
+        process_sleep(100000);
     }
 }
