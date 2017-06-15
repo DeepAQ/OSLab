@@ -55,9 +55,11 @@ PUBLIC void sys_process_sleep(int mill_seconds)
 
 PUBLIC void sys_disp_str(char* str)
 {
-    disp_str(str);
+    int colors[] = {9, 10, 11, 12, 13, 14, 15, 16};
+    disp_color_str(str, colors[p_proc_ready->pid % 8]);
     if (disp_pos >= 80 * 25 * 2) {
         disp_pos = 0;
+        memset(0xB8000, 0, 80 * 25 * 2);
     }
 }
 
