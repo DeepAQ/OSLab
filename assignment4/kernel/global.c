@@ -21,9 +21,9 @@ PUBLIC	char			task_stack[STACK_SIZE_TOTAL];
 
 PUBLIC	TASK	task_table[NR_TASKS] = {{TestA, STACK_SIZE_TESTA, "TestA"},
                                         {B, STACK_SIZE_TESTB, "B"},
-                                        {C, STACK_SIZE_TESTC, "C"},
-                                        {D, STACK_SIZE_TESTD, "D"},
-                                        {E, STACK_SIZE_TESTE, "E"}};
+                                        {CDE, STACK_SIZE_TESTC, "C"},
+                                        {CDE, STACK_SIZE_TESTD, "D"},
+                                        {CDE, STACK_SIZE_TESTE, "E"}};
 
 PUBLIC	irq_handler		irq_table[NR_IRQ];
 

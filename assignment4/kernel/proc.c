@@ -56,6 +56,9 @@ PUBLIC void sys_process_sleep(int mill_seconds)
 PUBLIC void sys_disp_str(char* str)
 {
     disp_str(str);
+    if (disp_pos >= 80 * 25 * 2) {
+        disp_pos = 0;
+    }
 }
 
 PUBLIC void sys_sem_p()

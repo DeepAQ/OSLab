@@ -87,34 +87,50 @@ void TestA()
         while (1) {}
 }
 
+#define NR_CHAIR 2
+
+int chair;
+int waiting;
+int customer_id;
+int my_queue[NR_CHAIR];
+
 void B()
 {
+    chair = NR_CHAIR;
+    waiting = 0;
+    customer_id = 0;
     while(1){
-        new_disp_str("B.");
-        process_sleep(1000);
+        if (waiting > 0) {
+            int customer = my_queue[0];
+            waiting--;
+            for (int i = 0; i < waiting; i++) {
+                my_queue[i] = my_queue[i + 1];
+            }
+            new_disp_str("Cut hair: ");
+            disp_int(customer);
+            new_disp_str("\n");
+            process_sleep(70000);
+            disp_int(customer);
+            new_disp_str(" done!\n");
+            chair++;
+        }
     }
 }
 
-void C()
+void CDE()
 {
-    while(1){
-        new_disp_str("C.");
-        process_sleep(1000);
-    }
-}
-
-void D()
-{
-    while(1){
-        new_disp_str("D.");
-        process_sleep(1000);
-    }
-}
-
-void E()
-{
-    while(1){
-        new_disp_str("E.");
-        process_sleep(1000);
+    while (1) {
+        process_sleep(50000);
+        customer_id++;
+        disp_int(customer_id);
+        new_disp_str(" coming\n");
+        if (chair <= 0) {
+            disp_int(customer_id);
+            new_disp_str(" no chair, leave\n");
+        } else {
+            chair--;
+            waiting++;
+            my_queue[waiting - 1] = customer_id;
+        }
     }
 }
