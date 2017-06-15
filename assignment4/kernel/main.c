@@ -84,33 +84,37 @@ PUBLIC int kernel_main()
  *======================================================================*/
 void TestA()
 {
-	int i = 0;
-	while (1) {
-                new_disp_str("A.");
-                milli_delay(5000);
-	}
+        while (1) {}
 }
 
-/*======================================================================*
-                               TestB
- *======================================================================*/
-void TestB()
+void B()
 {
-	int i = 0x1000;
-	while(1){
-                new_disp_str("B.");
-                process_sleep(5000);
-	}
+    while(1){
+        new_disp_str("B.");
+        process_sleep(1000);
+    }
 }
 
-/*======================================================================*
-                               TestB
- *======================================================================*/
-void TestC()
+void C()
 {
-	int i = 0x2000;
-	while(1){
-                new_disp_str("C.");
-                process_sleep(5000);
-	}
+    while(1){
+        new_disp_str("C.");
+        process_sleep(1000);
+    }
+}
+
+void D()
+{
+    while(1){
+        new_disp_str("D.");
+        process_sleep(1000);
+    }
+}
+
+void E()
+{
+    while(1){
+        new_disp_str("E.");
+        process_sleep(1000);
+    }
 }

@@ -23,8 +23,10 @@ void restart();
 
 /* main.c */
 void TestA();
-void TestB();
-void TestC();
+void B();
+void C();
+void D();
+void E();
 
 /* i8259.c */
 PUBLIC void put_irq_handler(int irq, irq_handler handler);
