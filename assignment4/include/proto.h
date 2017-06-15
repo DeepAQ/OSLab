@@ -5,6 +5,8 @@
                                                     Forrest Yu, 2005
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
+#include "proc.h"
+
 /* klib.asm */
 PUBLIC void	out_byte(u16 port, u8 value);
 PUBLIC u8	in_byte(u16 port);
@@ -38,16 +40,16 @@ PUBLIC void clock_handler(int irq);
 
 /* proc.c */
 PUBLIC  int     sys_get_ticks();        /* sys_call */
-PUBLIC  void    sys_process_sleep(int mill_seconds);
-PUBLIC  void    sys_disp_str(char* str);
-PUBLIC  void    sys_sem_p();
-PUBLIC  void    sys_sem_v();
+PUBLIC  void    sys_process_sleep(int);
+PUBLIC  void    sys_disp_str(char*);
+PUBLIC  void    sys_sem_p(SEMAPHORE*);
+PUBLIC  void    sys_sem_v(SEMAPHORE*);
 
 /* syscall.asm */
 PUBLIC  void    sys_call();             /* int_handler */
 PUBLIC  int     get_ticks();
-PUBLIC  void    process_sleep(int mill_seconds);
-PUBLIC  void    new_disp_str(char* str);
-PUBLIC  void    sem_p();
-PUBLIC  void    sem_v();
+PUBLIC  void    process_sleep(int);
+PUBLIC  void    new_disp_str(char*);
+PUBLIC  void    sem_p(SEMAPHORE*);
+PUBLIC  void    sem_v(SEMAPHORE*);
 

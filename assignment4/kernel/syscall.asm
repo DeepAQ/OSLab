@@ -46,11 +46,13 @@ new_disp_str:
 
 sem_p:
 	mov	eax, _NR_sem_p
+        mov     ebx, [esp + 4]
 	int	INT_VECTOR_SYS_CALL
 	ret
 
 sem_v:
 	mov	eax, _NR_sem_v
+        mov     ebx, [esp + 4]
 	int	INT_VECTOR_SYS_CALL
 	ret
 

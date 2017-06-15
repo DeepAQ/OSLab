@@ -5,6 +5,8 @@
                                                     Forrest Yu, 2005
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
+#ifndef PROC_H
+#define PROC_H
 
 typedef struct s_stackframe {	/* proc_ptr points here				↑ Low			*/
 	u32	gs;		/* ┓						│			*/
@@ -35,6 +37,7 @@ typedef struct s_proc {
 	DESCRIPTOR ldts[LDT_SIZE]; /* local descriptors for code and data */
 
         int sleep_ticks;
+        int blocked;
 
 	u32 pid;                   /* process id passed in from MM */
 	char p_name[16];           /* name of the process */
@@ -45,6 +48,11 @@ typedef struct s_task {
 	int	stacksize;
 	char	name[32];
 }TASK;
+
+typedef struct s_semaphore {
+        int     value;
+        PROCESS *queue[10];
+}SEMAPHORE;
 
 
 /* Number of tasks */
@@ -63,3 +71,4 @@ typedef struct s_task {
                                 STACK_SIZE_TESTD + \
                                 STACK_SIZE_TESTE)
 
+#endif
